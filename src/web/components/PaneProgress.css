@@ -1,0 +1,72 @@
+.pane-progress {
+  padding: 10px 14px 12px;
+  border-top: 1px solid rgba(72, 54, 33, 0.08);
+  background: rgba(255, 252, 246, 0.9);
+}
+
+.pane-progress-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.pane-progress-title {
+  font-size: 0.76rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.pane-progress-time {
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.pane-progress-explanation {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.pane-progress-list {
+  display: grid;
+  gap: 4px;
+}
+
+.pane-progress-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.pane-progress-symbol {
+  width: 1.1em;
+  flex: none;
+  color: var(--muted);
+}
+
+.pane-progress-step.is-completed .pane-progress-symbol {
+  color: var(--accent);
+}
+
+.pane-progress-step.is-in_progress .pane-progress-symbol {
+  color: #d78700;
+}
+
+.pane-progress-step.is-pending .pane-progress-text {
+  color: var(--muted);
+}
+
+.pane-progress-step.is-completed .pane-progress-text {
+  color: var(--text);
+}
+
+.pane-progress-step.is-in_progress .pane-progress-text {
+  color: var(--text);
+  font-weight: 600;
+}

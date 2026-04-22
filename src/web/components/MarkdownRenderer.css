@@ -1,0 +1,52 @@
+.markdown-body {
+  line-height: 1.74;
+  word-break: break-word;
+}
+
+.markdown-body > :first-child {
+  margin-top: 0;
+}
+
+.markdown-body > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown-body p,
+.markdown-body li,
+.markdown-body blockquote {
+  white-space: break-spaces;
+}
+
+.markdown-body p,
+.markdown-body ul,
+.markdown-body ol,
+.markdown-body blockquote,
+.markdown-body pre,
+.markdown-body table {
+  margin: 0.72em 0;
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  padding-inline-start: 1.5em;
+}
+
+.markdown-body li + li {
+  margin-top: 0.34em;
+}
+
+.markdown-body li > p {
+  margin: 0.18em 0;
+}
+
+.markdown-body blockquote {
+  padding-left: 1em;
+  border-left: 3px solid rgba(18, 110, 98, 0.22);
+  color: var(--muted);
+}
+
+.markdown-body hr {
+  border: none;
+  border-top: 1px solid rgba(72, 54, 33, 0.12);
+  margin: 0.9em 0;
+}

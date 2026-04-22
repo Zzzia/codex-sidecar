@@ -1,0 +1,237 @@
+.turn-question,
+.turn-answer,
+.turn-tools,
+.turn-patches,
+.turn-exploration {
+  border-top: none;
+  padding-top: 0;
+  margin: 18px 20px 0;
+}
+
+.turn-answer + .turn-answer {
+  margin-top: 0;
+}
+
+.turn-tools + .turn-tools,
+.turn-tools + .turn-exploration,
+.turn-exploration + .turn-tools,
+.turn-exploration + .turn-exploration {
+  margin-top: 2px;
+}
+
+.turn-question {
+  padding: 16px 18px;
+}
+
+.turn-tool-list {
+  display: grid;
+  gap: 2px;
+}
+
+.tool-run-row {
+  gap: 10px;
+  padding: 2px 2px;
+  border-radius: 10px;
+}
+
+.tool-run-main {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.tool-run-name {
+  flex: none;
+  margin-top: 0;
+  min-width: 2.4rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+.tool-run-preview {
+  margin-top: 0;
+  min-width: 0;
+  flex: 1;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.tool-run-hint {
+  opacity: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  transition: opacity 120ms ease;
+}
+
+.tool-run-row:hover,
+.tool-run-row:focus-visible {
+  background: rgba(72, 54, 33, 0.04);
+}
+
+.tool-run-row:hover .tool-run-hint,
+.tool-run-row:focus-visible .tool-run-hint {
+  opacity: 1;
+}
+
+.turn-exploration-list {
+  display: grid;
+  gap: 2px;
+}
+
+.exploration-row {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 2px 2px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 10px;
+}
+
+.exploration-main {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.exploration-row:hover,
+.exploration-row:focus-visible {
+  background: rgba(72, 54, 33, 0.04);
+}
+
+.exploration-label {
+  flex: none;
+  min-width: 44px;
+  color: var(--muted);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.exploration-summary {
+  min-width: 0;
+  flex: 0 1 auto;
+  max-width: min(100%, 68ch);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: "IBM Plex Mono", "Fira Code", monospace;
+  font-size: 0.78rem;
+  background: transparent;
+  color: var(--text);
+}
+
+.exploration-meta {
+  flex: none;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
+.exploration-row.is-running .exploration-meta {
+  color: var(--accent);
+}
+
+.exploration-row.is-error .exploration-summary,
+.exploration-row.is-error .exploration-meta {
+  color: var(--danger);
+}
+
+.tool-modal-call-block {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px dashed rgba(72, 54, 33, 0.12);
+}
+
+.tool-modal-call-title {
+  color: var(--muted);
+  font-size: 0.8rem;
+  word-break: break-word;
+}
+
+.inline-patch-file {
+  border: 1px solid rgba(72, 54, 33, 0.08);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.inline-patch-file + .inline-patch-file {
+  margin-top: 12px;
+}
+
+.inline-patch-file[open] {
+  box-shadow: 0 8px 20px rgba(72, 54, 33, 0.08);
+}
+
+.inline-patch-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.inline-patch-header::-webkit-details-marker {
+  display: none;
+}
+
+.inline-patch-toggle {
+  width: 0.8rem;
+  height: 0.8rem;
+  flex: none;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 140ms ease;
+}
+
+.inline-patch-file[open] .inline-patch-toggle {
+  transform: rotate(45deg);
+}
+
+.inline-patch-name {
+  min-width: 0;
+  color: var(--text);
+  font-family: "IBM Plex Mono", "Fira Code", monospace;
+  font-size: 0.8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inline-patch-type {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.inline-patch-header time {
+  flex: none;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.inline-patch-body {
+  padding: 0 14px 14px;
+  border-top: 1px solid rgba(72, 54, 33, 0.08);
+}
+
+.diff-viewer-note {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-family: "IBM Plex Mono", "Fira Code", monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
