@@ -30,6 +30,25 @@ function displayPath(filePath: string, cwd: string): string {
   return filePath;
 }
 
+const THREAD_SUMMARY_TEXT_LIMIT = 100;
+
+export function summarizeThreadText(
+  value: string,
+  limit = THREAD_SUMMARY_TEXT_LIMIT,
+): string {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    return "";
+  }
+
+  const chars = Array.from(normalized);
+  if (chars.length <= limit) {
+    return normalized;
+  }
+
+  return `${chars.slice(0, Math.max(0, limit - 1)).join("")}…`;
+}
+
 function extractTextContent(content: unknown): string {
   if (!Array.isArray(content)) {
     return "";
@@ -46,6 +65,10 @@ function extractTextContent(content: unknown): string {
     })
     .filter(Boolean)
     .join("");
+}
+
+function containsProposedPlan(text: string): boolean {
+  return /<proposed_plan>\s*[\s\S]*?<\/proposed_plan>/.test(text);
 }
 
 function parseJsonString(value: unknown): unknown {
@@ -256,17 +279,20 @@ function normalizePatchChanges(changes: unknown, cwd: string): PatchChange[] {
 }
 
 export function createThreadSummary(row: ThreadRow) {
+  const title = summarizeThreadText(row.title || row.first_user_message || row.id);
+  const firstUserMessage = summarizeThreadText(row.first_user_message || "");
+
   return {
     id: row.id,
     cwd: row.cwd,
     displayName: path.basename(row.cwd) || row.cwd,
-    title: row.title || row.first_user_message || row.id,
+    title,
     createdAt: row.created_at_ms,
     updatedAt: row.updated_at_ms,
     cliVersion: row.cli_version || "",
     source: row.source,
     rolloutPath: row.rollout_path,
-    firstUserMessage: row.first_user_message || "",
+    firstUserMessage,
     status: "idle" as ThreadStatus,
     eventCount: 0,
   };
@@ -412,7 +438,7 @@ export function normalizeRecord(
           role,
           phase: typeof payload.phase === "string" ? payload.phase : undefined,
           text,
-          isPlan: text.includes("<proposed_plan>"),
+          isPlan: containsProposedPlan(text),
         },
       ];
     }

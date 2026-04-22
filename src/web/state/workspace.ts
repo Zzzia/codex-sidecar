@@ -25,6 +25,7 @@ export interface WorkspaceState {
 }
 
 const SIDEBAR_STORAGE_KEY = "codex-app.workspace.v1";
+const LAYOUT_SIZE_EPSILON = 0.1;
 
 function createId(prefix: string): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
@@ -267,17 +268,35 @@ export function updateSplitSizes(
     return state;
   }
 
+  let changed = false;
+  const nextRoot = mapNode(state.root, splitId, (node) => {
+    if (node.type !== "split") {
+      return node;
+    }
+
+    const [left, right] = node.sizes;
+    const [nextLeft, nextRight] = sizes;
+    if (
+      Math.abs(left - nextLeft) <= LAYOUT_SIZE_EPSILON &&
+      Math.abs(right - nextRight) <= LAYOUT_SIZE_EPSILON
+    ) {
+      return node;
+    }
+
+    changed = true;
+    return {
+      ...node,
+      sizes,
+    };
+  });
+
+  if (!changed) {
+    return state;
+  }
+
   return {
     ...state,
-    root: mapNode(state.root, splitId, (node) => {
-      if (node.type !== "split") {
-        return node;
-      }
-      return {
-        ...node,
-        sizes,
-      };
-    }),
+    root: nextRoot,
   };
 }
 

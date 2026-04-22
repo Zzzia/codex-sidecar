@@ -9,7 +9,6 @@ interface ProjectRecord extends ProjectSummary {
 interface ProjectsState {
   items: ProjectRecord[];
   loading: boolean;
-  refreshing: boolean;
   error: string | null;
   loadMore: (cwd: string) => Promise<void>;
 }
@@ -33,10 +32,49 @@ function mergeThreads(
   return [...map.values()].sort((left, right) => right.updatedAt - left.updatedAt);
 }
 
+function sameThreads(first: ThreadSummary[], second: ThreadSummary[]): boolean {
+  if (first.length !== second.length) {
+    return false;
+  }
+
+  return first.every((item, index) => {
+    const other = second[index];
+    return (
+      other != null &&
+      item.id === other.id &&
+      item.title === other.title &&
+      item.displayName === other.displayName &&
+      item.updatedAt === other.updatedAt &&
+      item.status === other.status &&
+      item.eventCount === other.eventCount
+    );
+  });
+}
+
+function sameProjectRecords(first: ProjectRecord[], second: ProjectRecord[]): boolean {
+  if (first.length !== second.length) {
+    return false;
+  }
+
+  return first.every((item, index) => {
+    const other = second[index];
+    return (
+      other != null &&
+      item.cwd === other.cwd &&
+      item.displayName === other.displayName &&
+      item.latestUpdatedAt === other.latestUpdatedAt &&
+      item.activeThreadCount === other.activeThreadCount &&
+      item.totalThreadCount === other.totalThreadCount &&
+      item.nextCursor === other.nextCursor &&
+      sameThreads(item.recentThreads, other.recentThreads) &&
+      sameThreads(item.loadedThreads, other.loadedThreads)
+    );
+  });
+}
+
 export function useProjects(): ProjectsState {
   const [items, setItems] = useState<ProjectRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -46,8 +84,6 @@ export function useProjects(): ProjectsState {
       try {
         if (initial) {
           setLoading(true);
-        } else {
-          setRefreshing(true);
         }
         const data = await fetchJson<{ items: ProjectSummary[] }>("/api/projects");
         if (cancelled) {
@@ -56,7 +92,7 @@ export function useProjects(): ProjectsState {
 
         setItems((current) => {
           const currentMap = new Map(current.map((item) => [item.cwd, item]));
-          return data.items.map((project) => {
+          const nextItems = data.items.map((project) => {
             const existing = currentMap.get(project.cwd);
             const merged = mergeThreads(
               project.recentThreads,
@@ -68,6 +104,8 @@ export function useProjects(): ProjectsState {
               nextCursor: existing?.nextCursor ?? null,
             };
           });
+
+          return sameProjectRecords(current, nextItems) ? current : nextItems;
         });
         setError(null);
       } catch (requestError) {
@@ -81,7 +119,6 @@ export function useProjects(): ProjectsState {
       } finally {
         if (!cancelled) {
           setLoading(false);
-          setRefreshing(false);
         }
       }
     };
@@ -126,7 +163,6 @@ export function useProjects(): ProjectsState {
   return {
     items,
     loading,
-    refreshing,
     error,
     loadMore,
   };

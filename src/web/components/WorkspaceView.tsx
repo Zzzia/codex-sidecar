@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { Group, Panel, Separator } from "react-resizable-panels";
 import {
   closeLeafInWorkspace,
@@ -7,7 +7,6 @@ import {
   toggleLeafCollapse,
   toggleParentOrientation,
   updateSplitSizes,
-  type WorkspaceLeaf,
   type WorkspaceNode,
   type WorkspaceState,
 } from "@web/state/workspace";
@@ -15,6 +14,7 @@ import { PaneView } from "./PaneView";
 
 interface WorkspaceViewProps {
   state: WorkspaceState;
+  sidebarOpen: boolean;
   onChange: (updater: (state: WorkspaceState) => WorkspaceState) => void;
 }
 
@@ -22,12 +22,15 @@ function renderNode(
   node: WorkspaceNode,
   state: WorkspaceState,
   onChange: WorkspaceViewProps["onChange"],
+  suspended: boolean,
+  onResizeStart: () => void,
 ): JSX.Element {
   if (node.type === "leaf") {
     return (
       <PaneView
         threadId={node.threadId}
         collapsed={node.collapsed}
+        suspended={suspended}
         active={state.activeLeafId === node.id}
         onSelect={() => onChange((current) => setActiveLeaf(current, node.id))}
         onClose={() => onChange((current) => closeLeafInWorkspace(current, node.id))}
@@ -64,17 +67,97 @@ function renderNode(
     >
       {node.children.map((child, index) => (
         <Fragment key={child.id}>
-          <Panel id={child.id} minSize={child.type === "leaf" && child.collapsed ? "8%" : "20%"}>
-            {renderNode(child, state, onChange)}
+          <Panel
+            id={child.id}
+            minSize={child.type === "leaf" && child.collapsed ? "8%" : "20%"}
+          >
+            {renderNode(child, state, onChange, suspended, onResizeStart)}
           </Panel>
-          {index === 0 ? <Separator className="workspace-separator" /> : null}
+          {index === 0 ? (
+            <Separator
+              className="workspace-separator"
+              onPointerDown={onResizeStart}
+            />
+          ) : null}
         </Fragment>
       ))}
     </Group>
   );
 }
 
-export function WorkspaceView({ state, onChange }: WorkspaceViewProps) {
+export function WorkspaceView({ state, sidebarOpen, onChange }: WorkspaceViewProps) {
+  const [isResizing, setIsResizing] = useState(false);
+  const settleTimerRef = useRef<number | null>(null);
+  const didMountRef = useRef(false);
+  const previousSidebarOpenRef = useRef(sidebarOpen);
+
+  const clearSettleTimer = () => {
+    if (settleTimerRef.current != null) {
+      window.clearTimeout(settleTimerRef.current);
+      settleTimerRef.current = null;
+    }
+  };
+
+  const scheduleSettle = () => {
+    clearSettleTimer();
+    settleTimerRef.current = window.setTimeout(() => {
+      setIsResizing(false);
+      settleTimerRef.current = null;
+    }, 500);
+  };
+
+  const markLayoutChanging = () => {
+    setIsResizing(true);
+    scheduleSettle();
+  };
+
+  const beginResize = () => {
+    markLayoutChanging();
+  };
+
+  useEffect(() => {
+    if (!state.root) {
+      previousSidebarOpenRef.current = sidebarOpen;
+      return;
+    }
+
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      previousSidebarOpenRef.current = sidebarOpen;
+      return;
+    }
+
+    if (previousSidebarOpenRef.current !== sidebarOpen) {
+      previousSidebarOpenRef.current = sidebarOpen;
+      markLayoutChanging();
+    }
+  }, [sidebarOpen, state.root]);
+
+  useEffect(() => {
+    const settleResize = () => {
+      if (!isResizing) {
+        return;
+      }
+
+      scheduleSettle();
+    };
+
+    window.addEventListener("pointerup", settleResize);
+    window.addEventListener("pointercancel", settleResize);
+    window.addEventListener("resize", markLayoutChanging);
+    return () => {
+      window.removeEventListener("pointerup", settleResize);
+      window.removeEventListener("pointercancel", settleResize);
+      window.removeEventListener("resize", markLayoutChanging);
+    };
+  }, [isResizing]);
+
+  useEffect(() => {
+    return () => {
+      clearSettleTimer();
+    };
+  }, []);
+
   if (!state.root) {
     return (
       <section className="workspace-empty">
@@ -87,5 +170,9 @@ export function WorkspaceView({ state, onChange }: WorkspaceViewProps) {
     );
   }
 
-  return <section className="workspace-root">{renderNode(state.root, state, onChange)}</section>;
+  return (
+    <section className="workspace-root">
+      {renderNode(state.root, state, onChange, isResizing, beginResize)}
+    </section>
+  );
 }

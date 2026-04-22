@@ -6,6 +6,7 @@ import {
   openThreadInWorkspace,
   swapWithSibling,
   toggleLeafCollapse,
+  updateSplitSizes,
 } from "./workspace.js";
 
 test("openThreadInWorkspace focuses existing pane instead of duplicating thread", () => {
@@ -87,4 +88,25 @@ test("swapWithSibling flips leaf positions inside same split", () => {
       ? swapped.root.children[0].threadId
       : null;
   assert.equal(leftThread, "thread-b");
+});
+
+test("updateSplitSizes keeps workspace identity when layout does not change", () => {
+  let state = createInitialWorkspace();
+  state = openThreadInWorkspace(state, "thread-a");
+  state = openThreadInWorkspace(state, "thread-b");
+
+  if (state.root?.type !== "split") {
+    assert.fail("expected split before layout update");
+  }
+
+  const unchanged = updateSplitSizes(state, state.root.id, [50, 50]);
+  assert.equal(unchanged, state);
+
+  const changed = updateSplitSizes(state, state.root.id, [45, 55]);
+  assert.notEqual(changed, state);
+  assert.equal(changed.root?.type, "split");
+  if (changed.root?.type !== "split") {
+    assert.fail("expected split after layout update");
+  }
+  assert.deepEqual(changed.root.sizes, [45, 55]);
 });

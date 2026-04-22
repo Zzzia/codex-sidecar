@@ -98,3 +98,54 @@ test("extractThreadProgress completes in-progress steps after thread completion"
   );
   assert.equal(progress?.ts, "2026-04-22T08:00:05.000Z");
 });
+
+test("extractThreadProgress ignores stale plans from previous turns", () => {
+  const events: TimelineEvent[] = [
+    {
+      id: "user-1",
+      ts: "2026-04-22T08:00:00.000Z",
+      kind: "message",
+      role: "user",
+      text: "先修进度区",
+      isPlan: false,
+    },
+    {
+      id: "plan-1",
+      ts: "2026-04-22T08:00:01.000Z",
+      kind: "tool_call",
+      callId: "call-1",
+      tool: {
+        name: "update_plan",
+        argumentsText: JSON.stringify({
+          plan: [{ step: "修进度区", status: "in_progress" }],
+        }),
+        toolType: "function_call",
+      },
+    },
+    {
+      id: "done-1",
+      ts: "2026-04-22T08:00:02.000Z",
+      kind: "status",
+      status: "completed",
+      title: "对话结束",
+    },
+    {
+      id: "user-2",
+      ts: "2026-04-22T08:01:00.000Z",
+      kind: "message",
+      role: "user",
+      text: "再看一下侧栏",
+      isPlan: false,
+    },
+    {
+      id: "start-2",
+      ts: "2026-04-22T08:01:01.000Z",
+      kind: "status",
+      status: "running",
+      title: "对话开始",
+    },
+  ];
+
+  const progress = extractThreadProgress(events, "running");
+  assert.equal(progress, null);
+});

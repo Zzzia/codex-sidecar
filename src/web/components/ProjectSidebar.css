@@ -1,0 +1,131 @@
+.sidebar-header-copy {
+  min-width: 0;
+}
+
+.sidebar-header.is-rail {
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 14px 12px 12px;
+}
+
+.sidebar-rail-brand {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.project-title-main,
+.thread-title-row,
+.project-path-row {
+  min-width: 0;
+}
+
+.project-title-main {
+  display: grid;
+  gap: 3px;
+}
+
+.project-title-main strong,
+.project-path-row p,
+.thread-title-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-path-row,
+.thread-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.project-path-row p {
+  flex: 1;
+}
+
+.thread-title-text {
+  flex: 1;
+  font-size: 0.86rem;
+  font-weight: 400;
+  line-height: 1.35;
+  color: var(--text);
+}
+
+.sidebar-copy-button {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease, color 120ms ease, background 120ms ease;
+}
+
+.project-path-row:hover .sidebar-copy-button,
+.thread-row:hover .sidebar-copy-button,
+.thread-row:focus-visible .sidebar-copy-button {
+  opacity: 0.72;
+}
+
+.sidebar-copy-button:hover,
+.sidebar-copy-button:focus-visible {
+  opacity: 1;
+  color: var(--text);
+  background: rgba(72, 54, 33, 0.06);
+}
+
+.sidebar-copy-button.is-copied {
+  opacity: 1;
+  color: var(--accent);
+}
+
+.sidebar-filter-button {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.76);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.sidebar-filter-button.is-active {
+  color: var(--accent);
+  background: rgba(18, 110, 98, 0.08);
+  border-color: rgba(18, 110, 98, 0.2);
+}
+
+.thread-copy,
+.thread-title-row {
+  overflow: hidden;
+}
+
+.thread-title-text {
+  display: block;
+}

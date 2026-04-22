@@ -36,12 +36,19 @@ interface MutableTurn {
   patchMap: Map<string, PatchRunView>;
 }
 
-function createTurn(seedTs: string, status: ThreadStatus, title: string): MutableTurn {
+const DEFAULT_TURN_TITLE = "对话开始";
+
+function createTurn(
+  idSeed: string,
+  startedAt: string,
+  status: ThreadStatus,
+  title: string,
+): MutableTurn {
   return {
-    id: `turn:${seedTs}`,
+    id: `turn:${idSeed}`,
     userText: "",
-    startedAt: seedTs,
-    updatedAt: seedTs,
+    startedAt,
+    updatedAt: startedAt,
     status,
     statusTitle: title,
     blocks: [],
@@ -384,9 +391,22 @@ export function buildTurnCards(events: TimelineEvent[]): TurnCardView[] {
           title: event.title,
           ts: event.ts,
         };
+      } else if (
+        event.status === "running" &&
+        current.status === "completed" &&
+        (current.userText.trim() || current.blocks.length > 0)
+      ) {
+        flush();
+        pendingStatus = {
+          status: event.status,
+          title: event.title,
+          ts: event.ts,
+        };
       } else {
         current.status = event.status;
-        current.statusTitle = event.title;
+        if (!current.statusTitle || current.statusTitle === "对话中" || current.statusTitle === "待机") {
+          current.statusTitle = event.title;
+        }
         current.updatedAt = event.ts;
       }
       continue;
@@ -394,10 +414,12 @@ export function buildTurnCards(events: TimelineEvent[]): TurnCardView[] {
 
     if (event.kind === "message" && event.role === "user") {
       flush();
+      const startedAt = event.ts;
       current = createTurn(
-        `${event.ts}:${turnIndex}`,
+        `${startedAt}:${turnIndex}`,
+        startedAt,
         pendingStatus?.status ?? "running",
-        pendingStatus?.title ?? "对话中",
+        pendingStatus?.title ?? DEFAULT_TURN_TITLE,
       );
       turnIndex += 1;
       current.userText = event.text;
@@ -407,10 +429,12 @@ export function buildTurnCards(events: TimelineEvent[]): TurnCardView[] {
     }
 
     if (!current) {
+      const startedAt = pendingStatus?.ts ?? event.ts;
       current = createTurn(
-        `${pendingStatus?.ts ?? event.ts}:${turnIndex}`,
+        `${startedAt}:${turnIndex}`,
+        startedAt,
         pendingStatus?.status ?? "running",
-        pendingStatus?.title ?? "对话中",
+        pendingStatus?.title ?? DEFAULT_TURN_TITLE,
       );
       turnIndex += 1;
       pendingStatus = null;
@@ -494,4 +518,29 @@ export function buildTurnCards(events: TimelineEvent[]): TurnCardView[] {
 
   flush();
   return turns;
+}
+
+export function resolveTurnCardStatuses(
+  cards: TurnCardView[],
+  threadStatus: ThreadStatus,
+): TurnCardView[] {
+  if (cards.length === 0) {
+    return cards;
+  }
+
+  if (threadStatus === "running" || threadStatus === "idle") {
+    return cards;
+  }
+
+  const last = cards[cards.length - 1];
+  if (last.status !== "running" && last.status !== "idle") {
+    return cards;
+  }
+
+  const nextLast: TurnCardView = {
+    ...last,
+    status: threadStatus,
+  };
+
+  return [...cards.slice(0, -1), nextLast];
 }

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { explorationMeta } from "./timelineHelpers.js";
+import { explorationMeta, shouldShowPatchBackTop } from "./timelineHelpers.js";
 import type { ExplorationStepView, ToolRunView } from "@web/lib/turns";
 
 function createTool(overrides: Partial<ToolRunView> = {}): ToolRunView {
@@ -58,4 +58,16 @@ test("explorationMeta keeps running hint for a single active step", () => {
   };
 
   assert.equal(explorationMeta(step), "执行中");
+});
+
+test("shouldShowPatchBackTop only reacts to diff content taller than viewport", () => {
+  assert.equal(shouldShowPatchBackTop(1600, 900), true);
+  assert.equal(shouldShowPatchBackTop(900, 900), false);
+  assert.equal(shouldShowPatchBackTop(820, 900), false);
+});
+
+test("shouldShowPatchBackTop rejects invalid heights", () => {
+  assert.equal(shouldShowPatchBackTop(0, 900), false);
+  assert.equal(shouldShowPatchBackTop(Number.NaN, 900), false);
+  assert.equal(shouldShowPatchBackTop(1200, Number.POSITIVE_INFINITY), false);
 });

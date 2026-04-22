@@ -1,9 +1,10 @@
-import { useState } from "react";
-import { X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowUp, X } from "lucide-react";
 import type { PatchRunView, ExplorationStepView, ToolRunView } from "@web/lib/turns";
 import { DiffViewer } from "./DiffViewer";
 import {
   formatTimestamp,
+  shouldShowPatchBackTop,
   summarizeExplorationStep,
 } from "./timelineHelpers";
 
@@ -56,9 +57,50 @@ function InlinePatchFile({
   ts: string;
 }) {
   const [open, setOpen] = useState(true);
+  const detailsRef = useRef<HTMLDetailsElement | null>(null);
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  const diffContentRef = useRef<HTMLDivElement | null>(null);
+  const [showBackTop, setShowBackTop] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      setShowBackTop(false);
+      return;
+    }
+
+    const updateVisibility = () => {
+      const diffContent = diffContentRef.current;
+      if (!diffContent) {
+        setShowBackTop(false);
+        return;
+      }
+
+      setShowBackTop(
+        shouldShowPatchBackTop(diffContent.scrollHeight, window.innerHeight),
+      );
+    };
+
+    const frameId = window.requestAnimationFrame(updateVisibility);
+    let observer: ResizeObserver | null = null;
+
+    if (typeof ResizeObserver !== "undefined" && bodyRef.current) {
+      observer = new ResizeObserver(() => {
+        updateVisibility();
+      });
+      observer.observe(bodyRef.current);
+    }
+
+    window.addEventListener("resize", updateVisibility);
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      observer?.disconnect();
+      window.removeEventListener("resize", updateVisibility);
+    };
+  }, [open, unifiedDiff]);
 
   return (
     <details
+      ref={detailsRef}
       className="inline-patch-file"
       open={open}
       onToggle={(event) => {
@@ -72,12 +114,33 @@ function InlinePatchFile({
         <time>{formatTimestamp(ts)}</time>
       </summary>
       {open ? (
-        <div className="inline-patch-body">
-          <DiffViewer
-            fileName={fileName}
-            unifiedDiff={unifiedDiff}
-            changeType={changeType}
-          />
+        <div ref={bodyRef} className="inline-patch-body">
+          <div ref={diffContentRef}>
+            <DiffViewer
+              fileName={fileName}
+              unifiedDiff={unifiedDiff}
+              changeType={changeType}
+            />
+          </div>
+          {showBackTop ? (
+            <div className="inline-patch-actions">
+              <button
+                type="button"
+                className="inline-patch-backtop"
+                title="回到此 patch 顶部"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  detailsRef.current?.scrollIntoView({
+                    behavior: "auto",
+                    block: "start",
+                  });
+                }}
+              >
+                <ArrowUp size={12} />
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </details>

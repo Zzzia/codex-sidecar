@@ -75,3 +75,18 @@ export function explorationMeta(step: ExplorationStepView): string {
 
   return explorationState(step) === "running" ? "执行中" : "";
 }
+
+export function shouldShowPatchBackTop(
+  diffContentHeight: number,
+  viewportHeight: number,
+): boolean {
+  if (!Number.isFinite(diffContentHeight) || !Number.isFinite(viewportHeight)) {
+    return false;
+  }
+
+  if (diffContentHeight <= 0 || viewportHeight <= 0) {
+    return false;
+  }
+
+  return diffContentHeight > viewportHeight;
+}

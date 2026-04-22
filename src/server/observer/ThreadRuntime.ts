@@ -6,7 +6,11 @@ import type {
   ThreadSummary,
   TimelineEvent,
 } from "../../shared/types.js";
-import { createThreadSummary, normalizeRecord } from "./normalize.js";
+import {
+  createThreadSummary,
+  normalizeRecord,
+  summarizeThreadText,
+} from "./normalize.js";
 import type { ThreadRow, ThreadRuntimeState } from "./types.js";
 
 interface ThreadRuntimeEvents {
@@ -33,7 +37,12 @@ export class ThreadRuntime {
 
   updateRow(row: ThreadRow): void {
     this.summary.updatedAt = row.updated_at_ms;
-    this.summary.title = row.title || row.first_user_message || row.id;
+    this.summary.title = summarizeThreadText(
+      row.title || row.first_user_message || row.id,
+    );
+    this.summary.firstUserMessage = summarizeThreadText(
+      row.first_user_message || "",
+    );
   }
 
   async ensureLoaded(): Promise<void> {

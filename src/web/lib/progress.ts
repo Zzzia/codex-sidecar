@@ -17,6 +17,17 @@ export interface ThreadProgressView {
 type ToolCallEvent = Extract<TimelineEvent, { kind: "tool_call" }>;
 type MessageEvent = Extract<TimelineEvent, { kind: "message" }>;
 
+function sliceCurrentTurnEvents(events: TimelineEvent[]): TimelineEvent[] {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index];
+    if (event?.kind === "message" && event.role === "user") {
+      return events.slice(index);
+    }
+  }
+
+  return events;
+}
+
 function tryParseJson(text: string): Record<string, unknown> | null {
   try {
     const parsed = JSON.parse(text) as unknown;
@@ -178,10 +189,11 @@ export function extractThreadProgress(
   events: TimelineEvent[],
   threadStatus: ThreadStatus = "idle",
 ): ThreadProgressView | null {
+  const currentTurnEvents = sliceCurrentTurnEvents(events);
   let assistantFallback: ThreadProgressView | null = null;
   let latestPlan: ThreadProgressView | null = null;
 
-  for (const event of events) {
+  for (const event of currentTurnEvents) {
     if (event.kind === "tool_call") {
       const parsed = parseUpdatePlanEvent(event);
       if (parsed) {
@@ -198,7 +210,7 @@ export function extractThreadProgress(
     }
   }
 
-  const latestStatusEvent = findLatestStatusEvent(events);
+  const latestStatusEvent = findLatestStatusEvent(currentTurnEvents);
   const finalStatus =
     threadStatus !== "idle"
       ? threadStatus

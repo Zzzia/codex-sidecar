@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { TimelineEvent } from "@shared/types";
-import { buildTurnCards } from "./turns.js";
+import { buildTurnCards, resolveTurnCardStatuses } from "./turns.js";
 
 test("buildTurnCards merges one round into a single card", () => {
   const events: TimelineEvent[] = [
@@ -76,7 +76,9 @@ test("buildTurnCards merges one round into a single card", () => {
 
   assert.equal(cards.length, 1);
   assert.equal(cards[0]?.userText, "帮我看一下方案");
+  assert.equal(cards[0]?.startedAt, "2026-04-22T08:00:01.000Z");
   assert.equal(cards[0]?.status, "completed");
+  assert.equal(cards[0]?.statusTitle, "对话开始");
   assert.equal(cards[0]?.blocks.length, 2);
   assert.equal(cards[0]?.blocks[0]?.type, "assistant_markdown");
   if (cards[0]?.blocks[0]?.type !== "assistant_markdown") {
@@ -245,6 +247,40 @@ test("buildTurnCards reclassifies exec_command into exploration when parsed comm
   assert.equal(cards[0].blocks[0].items[0]?.kind, "read");
 });
 
+test("buildTurnCards keeps start title when task_started status is missing", () => {
+  const events: TimelineEvent[] = [
+    {
+      id: "u1",
+      ts: "2026-04-22T08:00:01.000Z",
+      kind: "message",
+      role: "user",
+      text: "看一下最新结果",
+      isPlan: false,
+    },
+    {
+      id: "a1",
+      ts: "2026-04-22T08:00:02.000Z",
+      kind: "message",
+      role: "assistant",
+      text: "先整理上下文。",
+      isPlan: false,
+    },
+    {
+      id: "s1",
+      ts: "2026-04-22T08:00:03.000Z",
+      kind: "status",
+      status: "completed",
+      title: "对话结束",
+    },
+  ];
+
+  const cards = buildTurnCards(events);
+
+  assert.equal(cards.length, 1);
+  assert.equal(cards[0]?.status, "completed");
+  assert.equal(cards[0]?.statusTitle, "对话开始");
+});
+
 test("buildTurnCards skips update_plan and assistant plan content in timeline body", () => {
   const events: TimelineEvent[] = [
     {
@@ -343,4 +379,108 @@ test("buildTurnCards filters write_stdin tool events", () => {
   assert.equal(cards.length, 1);
   assert.equal(cards[0]?.blocks.length, 1);
   assert.equal(cards[0]?.blocks[0]?.type, "assistant_markdown");
+});
+
+test("buildTurnCards splits rounds when a new running status appears after completion", () => {
+  const events: TimelineEvent[] = [
+    {
+      id: "s1",
+      ts: "2026-04-22T08:00:00.000Z",
+      kind: "status",
+      status: "running",
+      title: "对话开始",
+    },
+    {
+      id: "u1",
+      ts: "2026-04-22T08:00:01.000Z",
+      kind: "message",
+      role: "user",
+      text: "第一轮",
+      isPlan: false,
+    },
+    {
+      id: "a1",
+      ts: "2026-04-22T08:00:02.000Z",
+      kind: "message",
+      role: "assistant",
+      text: "第一轮结果",
+      isPlan: false,
+    },
+    {
+      id: "s2",
+      ts: "2026-04-22T08:00:03.000Z",
+      kind: "status",
+      status: "completed",
+      title: "对话结束",
+    },
+    {
+      id: "s3",
+      ts: "2026-04-22T08:00:04.000Z",
+      kind: "status",
+      status: "running",
+      title: "对话开始",
+    },
+    {
+      id: "u2",
+      ts: "2026-04-22T08:00:05.000Z",
+      kind: "message",
+      role: "user",
+      text: "第二轮",
+      isPlan: false,
+    },
+  ];
+
+  const cards = buildTurnCards(events);
+  assert.equal(cards.length, 2);
+  assert.equal(cards[0]?.status, "completed");
+  assert.equal(cards[0]?.statusTitle, "对话开始");
+  assert.equal(cards[1]?.status, "running");
+  assert.equal(cards[1]?.statusTitle, "对话开始");
+});
+
+test("resolveTurnCardStatuses applies thread completion to a trailing running turn", () => {
+  const cards = buildTurnCards([
+    {
+      id: "u1",
+      ts: "2026-04-22T08:00:01.000Z",
+      kind: "message",
+      role: "user",
+      text: "继续执行",
+      isPlan: false,
+    },
+    {
+      id: "a1",
+      ts: "2026-04-22T08:00:03.000Z",
+      kind: "message",
+      role: "assistant",
+      text: "处理中",
+      isPlan: false,
+    },
+  ]);
+
+  const resolved = resolveTurnCardStatuses(cards, "completed");
+  assert.equal(resolved[0]?.status, "completed");
+});
+
+test("resolveTurnCardStatuses keeps explicit turn terminal status", () => {
+  const cards = buildTurnCards([
+    {
+      id: "u1",
+      ts: "2026-04-22T08:00:01.000Z",
+      kind: "message",
+      role: "user",
+      text: "继续执行",
+      isPlan: false,
+    },
+    {
+      id: "s1",
+      ts: "2026-04-22T08:00:02.000Z",
+      kind: "status",
+      status: "error",
+      title: "执行异常",
+    },
+  ]);
+
+  const resolved = resolveTurnCardStatuses(cards, "completed");
+  assert.equal(resolved[0]?.status, "error");
 });

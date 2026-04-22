@@ -50,7 +50,6 @@ export default function App() {
       <ProjectSidebar
         projects={projects.items}
         loading={projects.loading}
-        refreshing={projects.refreshing}
         error={projects.error}
         sidebarOpen={sidebarOpen}
         activeOnlyByProject={activeOnlyByProject}
@@ -66,7 +65,11 @@ export default function App() {
         }
         onLoadMore={projects.loadMore}
       />
-      <WorkspaceView state={workspace} onChange={onWorkspaceChange} />
+      <WorkspaceView
+        state={workspace}
+        sidebarOpen={sidebarOpen}
+        onChange={onWorkspaceChange}
+      />
     </main>
   );
 }

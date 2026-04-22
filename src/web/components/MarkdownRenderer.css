@@ -1,6 +1,8 @@
 .markdown-body {
   line-height: 1.74;
   word-break: break-word;
+  overflow-wrap: anywhere;
+  max-width: 100%;
 }
 
 .markdown-body > :first-child {
@@ -12,9 +14,11 @@
 }
 
 .markdown-body p,
-.markdown-body li,
-.markdown-body blockquote {
+.markdown-body blockquote,
+.markdown-body td,
+.markdown-body th {
   white-space: break-spaces;
+  overflow-wrap: anywhere;
 }
 
 .markdown-body p,
@@ -28,21 +32,80 @@
 
 .markdown-body ul,
 .markdown-body ol {
+  list-style-position: outside;
   padding-inline-start: 1.5em;
+}
+
+.markdown-body ul {
+  list-style-type: disc;
+}
+
+.markdown-body ul ul {
+  list-style-type: circle;
+}
+
+.markdown-body ol {
+  list-style-type: decimal;
+}
+
+.markdown-body ol ol {
+  list-style-type: lower-alpha;
+}
+
+.markdown-body li {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.markdown-body li::marker {
+  color: var(--text);
 }
 
 .markdown-body li + li {
   margin-top: 0.34em;
 }
 
+.markdown-body li > p,
+.markdown-body li > blockquote,
+.markdown-body li > pre,
+.markdown-body li > table {
+  white-space: break-spaces;
+}
+
 .markdown-body li > p {
   margin: 0.18em 0;
+}
+
+.markdown-body li > ul,
+.markdown-body li > ol {
+  margin: 0.22em 0 0.14em;
+}
+
+.markdown-body ul ul,
+.markdown-body ul ol,
+.markdown-body ol ul,
+.markdown-body ol ol {
+  margin-top: 0.22em;
+  margin-bottom: 0.14em;
 }
 
 .markdown-body blockquote {
   padding-left: 1em;
   border-left: 3px solid rgba(18, 110, 98, 0.22);
   color: var(--muted);
+}
+
+.markdown-body table,
+.markdown-body pre,
+.markdown-body img,
+.markdown-body video,
+.markdown-body svg {
+  max-width: 100%;
+}
+
+.markdown-body table {
+  display: block;
+  overflow-x: auto;
 }
 
 .markdown-body hr {

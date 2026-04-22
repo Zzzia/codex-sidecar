@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { normalizeRecord } from "./normalize.js";
+import {
+  createThreadSummary,
+  normalizeRecord,
+  summarizeThreadText,
+} from "./normalize.js";
 import type { ThreadRow } from "./types.js";
 
 const row: ThreadRow = {
@@ -42,6 +46,35 @@ test("normalizeRecord extracts assistant markdown message and plan flag", () => 
   assert.equal(events.length, 1);
   assert.equal(events[0]?.kind, "message");
   assert.equal(events[0]?.isPlan, true);
+});
+
+test("normalizeRecord does not mark plain proposed_plan mentions as plans", () => {
+  const events = normalizeRecord(
+    {
+      timestamp: "2026-04-22T08:00:00.000Z",
+      type: "response_item",
+      payload: {
+        type: "message",
+        role: "assistant",
+        content: [
+          {
+            type: "output_text",
+            text: "这里会把 `<proposed_plan>` 当作普通文本说明，不是真正的计划块。",
+          },
+        ],
+      },
+    },
+    {
+      row,
+      callNames: new Map(),
+      status: "idle",
+    },
+    1,
+  );
+
+  assert.equal(events.length, 1);
+  assert.equal(events[0]?.kind, "message");
+  assert.equal(events[0]?.isPlan, false);
 });
 
 test("normalizeRecord preserves parsed exec commands from exec_command_end", () => {
@@ -206,4 +239,26 @@ test("normalizeRecord ignores token_count and agent_message duplicates", () => {
 
   assert.deepEqual(metricEvents, []);
   assert.deepEqual(agentEvents, []);
+});
+
+test("summarizeThreadText collapses whitespace and truncates long text", () => {
+  const summary = summarizeThreadText(
+    `第一行内容\n第二行内容 ${"很长".repeat(60)}`,
+  );
+
+  assert.ok(summary.length <= 100);
+  assert.match(summary, /第一行内容 第二行内容/);
+  assert.ok(summary.endsWith("…"));
+});
+
+test("createThreadSummary truncates title and first user message for sidebar payloads", () => {
+  const summary = createThreadSummary({
+    ...row,
+    title: "",
+    first_user_message: `  ${"这是一段很长的会话标题".repeat(12)}  `,
+  });
+
+  assert.ok(summary.title.length <= 100);
+  assert.ok(summary.firstUserMessage.length <= 100);
+  assert.ok(summary.title.endsWith("…"));
 });

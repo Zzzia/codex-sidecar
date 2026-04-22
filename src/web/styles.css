@@ -45,8 +45,14 @@ a {
 .app-shell {
   height: 100%;
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
   overflow: hidden;
+  min-width: 0;
+}
+
+.app-shell > * {
+  min-width: 0;
+  min-height: 0;
 }
 
 .project-sidebar {
@@ -112,11 +118,14 @@ a {
   padding: 14px;
   height: calc(100% - 124px);
   overflow: auto;
+  min-width: 0;
 }
 
 .project-card {
   margin-bottom: 14px;
   padding: 14px;
+  min-width: 0;
+  overflow: hidden;
   border-radius: 20px;
   background: var(--panel);
   border: 1px solid var(--line);
@@ -137,25 +146,45 @@ a {
 .project-card-header {
   justify-content: space-between;
   gap: 12px;
+  min-width: 0;
 }
 
 .project-title-wrap {
   gap: 10px;
+  min-width: 0;
+  flex: 1;
 }
 
 .project-title-wrap p {
   margin: 3px 0 0;
   color: var(--muted);
   font-size: 0.82rem;
-  word-break: break-all;
+}
+
+.project-title-wrap strong,
+.project-title-wrap p,
+.project-stats span,
+.thread-copy strong,
+.thread-row time,
+.sidebar-header h1,
+.sidebar-eyebrow {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .project-stats {
   gap: 12px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   margin-top: 10px;
+  min-width: 0;
+  overflow: hidden;
   color: var(--muted);
   font-size: 0.82rem;
+}
+
+.project-stats span {
+  min-width: 0;
 }
 
 .project-updated {
@@ -168,15 +197,19 @@ a {
   margin-top: 12px;
   display: grid;
   gap: 8px;
+  min-width: 0;
 }
 
 .thread-row {
   width: 100%;
+  min-width: 0;
+  overflow: hidden;
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.7);
   border-radius: 16px;
   padding: 10px 12px;
   justify-content: space-between;
+  gap: 10px;
   text-align: left;
   cursor: pointer;
   transition: border-color 150ms ease, transform 150ms ease;
@@ -190,18 +223,20 @@ a {
 .thread-copy {
   flex: 1;
   min-width: 0;
-  margin-left: 10px;
+  overflow: hidden;
+  margin-left: 2px;
 }
 
-.thread-copy strong,
-.thread-copy span {
-  display: block;
-}
-
-.thread-copy span,
 .thread-row time {
   color: var(--muted);
   font-size: 0.8rem;
+}
+
+.thread-row time {
+  flex: none;
+  width: 5rem;
+  min-width: 5rem;
+  text-align: right;
 }
 
 .thread-empty {
@@ -256,12 +291,24 @@ a {
 
 .workspace-root,
 .workspace-group,
-.workspace-root > div {
+.workspace-root > div,
+.workspace-root [data-group],
+.workspace-root [data-panel] {
   height: 100%;
+  min-width: 0;
+  min-height: 0;
 }
 
 .workspace-root {
   padding: 14px;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.workspace-group {
+  width: 100%;
+  max-width: 100%;
 }
 
 .workspace-separator[data-separator] {
@@ -277,6 +324,10 @@ a {
 
 .pane-view {
   height: 100%;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  isolation: isolate;
   border: 1px solid var(--line);
   border-radius: 22px;
   overflow: hidden;
@@ -293,7 +344,9 @@ a {
 
 .pane-header {
   justify-content: space-between;
-  padding: 14px 16px;
+  gap: 12px;
+  min-width: 0;
+  padding: 11px 14px;
   border-bottom: 1px solid var(--line);
   background:
     linear-gradient(90deg, rgba(18, 110, 98, 0.08), transparent 45%),
@@ -301,29 +354,43 @@ a {
 }
 
 .pane-title-wrap {
-  gap: 10px;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
+  flex: 1;
+  overflow: hidden;
 }
 
-.pane-title-group {
-  min-width: 0;
-}
-
-.pane-title {
-  display: block;
+.pane-project-name {
+  flex: none;
+  max-width: 11rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.pane-subtitle {
   color: var(--muted);
   font-size: 0.8rem;
 }
 
+.pane-title-divider {
+  flex: none;
+  color: rgba(109, 90, 71, 0.55);
+}
+
+.pane-title {
+  min-width: 0;
+  flex: 1;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.88rem;
+  font-weight: 400;
+}
+
 .pane-actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
+  flex: none;
 }
 
 .pane-body {
@@ -331,11 +398,39 @@ a {
   flex: 1;
   display: flex;
   flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  border-radius: 0 0 22px 22px;
+  clip-path: inset(0 round 0 0 22px 22px);
 }
 
 .pane-placeholder {
   padding: 18px;
   color: var(--muted);
+}
+
+.pane-content {
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.pane-content.is-suspended {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.pane-suspend-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  color: var(--muted);
+  background: rgba(255, 252, 246, 0.84);
+  backdrop-filter: blur(4px);
 }
 
 .timeline-shell {
@@ -344,146 +439,11 @@ a {
   position: relative;
 }
 
-.turn-card {
-  margin: 16px 14px 22px;
-  padding: 2px 0 18px;
-}
-
-.turn-card-header {
-  justify-content: space-between;
-  gap: 16px;
-  margin: 0 20px 14px;
-  color: var(--muted);
-  font-size: 0.8rem;
-}
-
 .tool-modal-eyebrow {
   text-transform: uppercase;
   letter-spacing: 0.14em;
   font-size: 0.72rem;
   color: var(--muted);
-}
-
-.turn-question,
-.turn-answer,
-.turn-plan,
-.turn-tools,
-.turn-patches {
-  border-top: 1px solid rgba(72, 54, 33, 0.08);
-  padding-top: 14px;
-  margin: 14px 20px 0;
-}
-
-.turn-question {
-  background: rgba(18, 110, 98, 0.06);
-  border-radius: 16px;
-  padding: 16px 18px;
-  border: 1px solid rgba(18, 110, 98, 0.12);
-}
-
-.turn-plan {
-  background: rgba(18, 110, 98, 0.05);
-  border-radius: 16px;
-  padding: 14px;
-  border: 1px solid rgba(18, 110, 98, 0.14);
-}
-
-.turn-tool-list {
-  display: grid;
-  gap: 4px;
-}
-
-.tool-run-row {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 4px 2px;
-  border: none;
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
-}
-
-.tool-run-icon {
-  width: 20px;
-  height: 20px;
-  border-radius: 8px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(18, 110, 98, 0.06);
-  color: var(--accent);
-  flex: none;
-}
-
-.tool-run-row.is-error .tool-run-icon {
-  background: rgba(165, 60, 47, 0.12);
-  color: var(--danger);
-}
-
-.tool-run-copy {
-  min-width: 0;
-  flex: 1;
-}
-
-.tool-run-name,
-.tool-run-preview {
-  display: block;
-}
-
-.tool-run-name {
-  font-size: 0.7rem;
-  color: var(--muted);
-}
-
-.tool-run-preview {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  margin-top: 2px;
-  font-family: "IBM Plex Mono", "Fira Code", monospace;
-  background: transparent;
-  font-size: 0.82rem;
-  line-height: 1.45;
-}
-
-.tool-run-badge {
-  max-width: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  padding: 4px 8px;
-  border-radius: 999px;
-  background: rgba(18, 110, 98, 0.08);
-  color: var(--accent);
-  font-size: 0.76rem;
-}
-
-.tool-run-badge.is-success {
-  background: rgba(18, 110, 98, 0.12);
-}
-
-.tool-run-badge.is-error {
-  background: rgba(165, 60, 47, 0.14);
-  color: var(--danger);
-}
-
-.jump-latest-button {
-  position: absolute;
-  right: 18px;
-  bottom: 18px;
-  z-index: 3;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  border: 1px solid rgba(18, 110, 98, 0.16);
-  border-radius: 999px;
-  background: rgba(255, 252, 246, 0.96);
-  box-shadow: 0 14px 24px rgba(18, 110, 98, 0.16);
-  color: var(--text);
-  cursor: pointer;
 }
 
 .tool-modal-backdrop {
@@ -586,6 +546,7 @@ a {
 .code-block {
   margin: 10px 0 0;
   padding: 12px;
+  max-width: 100%;
   overflow: auto;
   border-radius: 14px;
   background: #1e1d18;
@@ -614,16 +575,35 @@ a {
 }
 
 .status-dot.status-running {
-  background: #0d8c7d;
-  box-shadow: 0 0 0 6px rgba(13, 140, 125, 0.12);
+  background: #c8952b;
 }
 
 .status-dot.status-completed {
-  background: #d78700;
+  background: #207f5f;
 }
 
 .status-dot.status-error {
-  background: #a53c2f;
+  background: #9d978e;
+}
+
+.timeline-scroller {
+  overflow-x: hidden !important;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(92, 75, 55, 0.26) transparent;
+}
+
+.timeline-scroller::-webkit-scrollbar {
+  width: 7px;
+  height: 0;
+}
+
+.timeline-scroller::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(92, 75, 55, 0.24);
+}
+
+.timeline-scroller::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .workspace-empty {
