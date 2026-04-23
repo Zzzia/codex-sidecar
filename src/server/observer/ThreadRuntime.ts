@@ -2,6 +2,7 @@ import { createReadStream } from "node:fs";
 import { access, constants } from "node:fs/promises";
 import { EventEmitter } from "node:events";
 import type {
+  ThreadDelta,
   ThreadSnapshot,
   ThreadSummary,
   TimelineEvent,
@@ -69,10 +70,19 @@ export class ThreadRuntime {
   }
 
   async getSnapshot(): Promise<ThreadSnapshot> {
-    await this.ensureLoaded();
+    await this.refresh();
     return {
       thread: this.getSummary(),
       events: [...this.events],
+      nextCursor: this.events.length,
+    };
+  }
+
+  async getDelta(cursor: number): Promise<ThreadDelta> {
+    await this.refresh();
+    return {
+      thread: this.getSummary(),
+      events: this.events.slice(Math.max(0, cursor)),
       nextCursor: this.events.length,
     };
   }

@@ -19,7 +19,10 @@ import {
   ToolDetailsModal,
 } from "./TimelineInspectors";
 import { ExplorationRunList, ToolRunList } from "./TimelineRuns";
+import type { LocalFileContext } from "./localFilePreview";
 import { formatTimestamp } from "./timelineHelpers";
+
+type TimelineScrollBehavior = "auto" | "smooth";
 
 function statusLabel(status: ThreadStatus, title: string): string {
   if (title) {
@@ -111,11 +114,13 @@ function TurnCard({
   card,
   onInspectTool,
   onInspectExploration,
+  localFileContext,
 }: {
   index: number;
   card: ReturnType<typeof buildTurnCards>[number];
   onInspectTool: (tool: ToolRunView) => void;
   onInspectExploration: (step: ExplorationStepView) => void;
+  localFileContext: LocalFileContext | null;
 }) {
   return (
     <article
@@ -136,7 +141,7 @@ function TurnCard({
 
       {card.userText ? (
         <section className="turn-question">
-          <MarkdownRenderer text={card.userText} />
+          <MarkdownRenderer text={card.userText} localFileContext={localFileContext} />
         </section>
       ) : null}
 
@@ -144,7 +149,7 @@ function TurnCard({
         if (block.type === "assistant_markdown") {
           return (
             <section key={block.id} className="turn-answer">
-              <MarkdownRenderer text={block.text} />
+              <MarkdownRenderer text={block.text} localFileContext={localFileContext} />
             </section>
           );
         }
@@ -238,17 +243,22 @@ function findCurrentTurnCardIndex(scroller: HTMLElement): number | null {
 
 export function Timeline({
   threadId,
+  cwd,
   events,
   threadStatus,
 }: {
   threadId: string;
+  cwd: string;
   events: Parameters<typeof buildTurnCards>[0];
   threadStatus: ThreadStatus;
 }) {
   const cards = resolveTurnCardStatuses(buildTurnCards(events), threadStatus);
+  const localFileContext =
+    cwd.trim().length > 0 ? { threadId, cwd } satisfies LocalFileContext : null;
   const listRef = useRef<VirtuosoHandle | null>(null);
   const scrollerRef = useRef<HTMLElement | null>(null);
   const [scrollerNode, setScrollerNode] = useState<HTMLElement | null>(null);
+  const didPrimeScrollRef = useRef(false);
   const followScrollPending = useRef(false);
   const visibleStartIndexRef = useRef(0);
   const [isAtTop, setIsAtTop] = useState(true);
@@ -257,6 +267,7 @@ export function Timeline({
   const [selectedItem, setSelectedItem] = useState<InspectTarget | null>(null);
 
   useEffect(() => {
+    didPrimeScrollRef.current = false;
     followScrollPending.current = false;
     setIsAtTop(true);
     setIsAtBottom(true);
@@ -264,23 +275,38 @@ export function Timeline({
     setSelectedItem(null);
   }, [threadId]);
 
+  const scrollTimelineToBottom = (behavior: TimelineScrollBehavior) => {
+    if (cards.length === 0) {
+      return;
+    }
+
+    followScrollPending.current = true;
+    if (scrollerRef.current) {
+      scrollerRef.current.scrollTo({
+        top: scrollerRef.current.scrollHeight,
+        behavior,
+      });
+      return;
+    }
+
+    listRef.current?.scrollToIndex({
+      index: cards.length - 1,
+      align: "end",
+      behavior,
+    });
+  };
+
   useEffect(() => {
     if (!followLatest || cards.length === 0 || events.length === 0) {
       return;
     }
 
-    followScrollPending.current = true;
+    const behavior: TimelineScrollBehavior = didPrimeScrollRef.current
+      ? "smooth"
+      : "auto";
+    didPrimeScrollRef.current = true;
     const frame = requestAnimationFrame(() => {
-      if (scrollerRef.current) {
-        scrollerRef.current.scrollTop = scrollerRef.current.scrollHeight;
-        return;
-      }
-
-      listRef.current?.scrollToIndex({
-        index: cards.length - 1,
-        align: "end",
-        behavior: "auto",
-      });
+      scrollTimelineToBottom(behavior);
     });
     return () => {
       cancelAnimationFrame(frame);
@@ -326,18 +352,9 @@ export function Timeline({
     if (cards.length === 0) {
       return;
     }
-    followScrollPending.current = true;
     setFollowLatest(true);
-    if (scrollerRef.current) {
-      scrollerRef.current.scrollTop = scrollerRef.current.scrollHeight;
-      return;
-    }
-
-    listRef.current?.scrollToIndex({
-      index: cards.length - 1,
-      align: "end",
-      behavior: "auto",
-    });
+    didPrimeScrollRef.current = true;
+    scrollTimelineToBottom("auto");
   };
 
   const jumpToTop = () => {
@@ -365,7 +382,8 @@ export function Timeline({
         data={cards}
         alignToBottom
         components={{ Footer: TimelineFooterSpacer }}
-        followOutput={followLatest ? "auto" : false}
+        computeItemKey={(_, card) => card.id}
+        followOutput={followLatest ? "smooth" : false}
         rangeChanged={(range) => {
           visibleStartIndexRef.current = range.startIndex;
         }}
@@ -390,6 +408,7 @@ export function Timeline({
             card={card}
             onInspectTool={(tool) => setSelectedItem({ kind: "tool", tool })}
             onInspectExploration={(step) => setSelectedItem({ kind: "exploration", step })}
+            localFileContext={localFileContext}
           />
         )}
       />

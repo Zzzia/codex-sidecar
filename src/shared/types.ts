@@ -30,9 +30,26 @@ export interface ThreadSnapshot {
   nextCursor: number;
 }
 
+export interface ThreadDelta {
+  thread: ThreadSummary;
+  events: TimelineEvent[];
+  nextCursor: number;
+}
+
 export interface ThreadPage {
   items: ThreadSummary[];
   nextCursor: string | null;
+}
+
+export type LocalFilePreviewKind = "markdown" | "code" | "unsupported";
+
+export interface LocalFilePreview {
+  path: string;
+  displayPath: string;
+  kind: LocalFilePreviewKind;
+  size: number;
+  content?: string;
+  reason?: string;
 }
 
 export type ParsedCommand =

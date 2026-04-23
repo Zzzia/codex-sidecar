@@ -263,6 +263,8 @@ a {
 .code-block {
   margin: 0.78em 0;
   padding: 13px 14px;
+  width: 100%;
+  min-width: 0;
   max-width: 100%;
   overflow: auto;
   border: 1px solid var(--code-block-border);
@@ -277,6 +279,7 @@ a {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.78),
     0 1px 2px rgba(52, 48, 40, 0.04);
+  contain: inline-size;
   scrollbar-width: thin;
   scrollbar-color: rgba(92, 84, 72, 0.3) transparent;
   tab-size: 2;
@@ -336,8 +339,28 @@ a {
 .mermaid-block,
 .mermaid-loading {
   padding: 14px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 160px;
+  overflow-x: auto;
   border-radius: 16px;
   background: rgba(246, 240, 231, 0.96);
+  contain: inline-size;
+}
+
+.mermaid-block.is-loading {
+  display: flex;
+  align-items: center;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.mermaid-block svg {
+  display: block;
+  width: 100% !important;
+  max-width: 100%;
+  height: auto;
 }
 
 .status-dot {

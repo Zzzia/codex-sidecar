@@ -28,16 +28,18 @@ export interface PaneViewProps {
 
 const PaneContent = memo(function PaneContent({
   threadId,
+  cwd,
   events,
   status,
 }: {
   threadId: string;
+  cwd: string;
   events: Parameters<typeof Timeline>[0]["events"];
   status: ThreadStatus;
 }) {
   return (
     <>
-      <Timeline threadId={threadId} events={events} threadStatus={status} />
+      <Timeline threadId={threadId} cwd={cwd} events={events} threadStatus={status} />
       <PaneProgress events={events} threadStatus={status} />
     </>
   );
@@ -165,6 +167,7 @@ export function PaneView(props: PaneViewProps) {
             <div className={`pane-content ${props.suspended ? "is-suspended" : ""}`}>
               <PaneContent
                 threadId={props.threadId}
+                cwd={thread?.cwd ?? ""}
                 events={events}
                 status={status}
               />

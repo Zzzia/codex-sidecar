@@ -1,8 +1,12 @@
 .markdown-body {
+  width: 100%;
+  min-width: 0;
   line-height: 1.74;
   word-break: break-word;
   overflow-wrap: anywhere;
+  overflow-x: hidden;
   max-width: 100%;
+  contain: inline-size;
 }
 
 .markdown-body > :first-child {
@@ -104,12 +108,15 @@
 }
 
 .markdown-table-scroll {
+  width: 100%;
+  min-width: 0;
   max-width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
   border: 1px solid rgba(45, 42, 36, 0.12);
   border-radius: 10px;
   background: rgba(255, 255, 252, 0.72);
+  contain: inline-size;
   scrollbar-width: thin;
   scrollbar-color: rgba(92, 84, 72, 0.28) transparent;
 }
@@ -174,4 +181,95 @@
   border: none;
   border-top: 1px solid rgba(72, 54, 33, 0.12);
   margin: 0.9em 0;
+}
+
+.local-file-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: rgba(42, 32, 23, 0.26);
+  backdrop-filter: blur(7px);
+}
+
+.local-file-modal {
+  width: min(980px, 100%);
+  max-height: min(820px, calc(100vh - 44px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(72, 54, 33, 0.14);
+  border-radius: 18px;
+  background: rgba(255, 251, 244, 0.98);
+  box-shadow: 0 28px 70px rgba(42, 32, 23, 0.24);
+}
+
+.local-file-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid rgba(72, 54, 33, 0.1);
+}
+
+.local-file-modal-title-wrap {
+  min-width: 0;
+}
+
+.local-file-modal-eyebrow {
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.local-file-modal-header h3 {
+  margin: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.96rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.local-file-modal-meta {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.local-file-modal-body {
+  min-height: 0;
+  overflow: auto;
+  padding: 16px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(92, 84, 72, 0.28) transparent;
+}
+
+.local-file-modal-body::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.local-file-modal-body::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(92, 84, 72, 0.28);
+}
+
+.local-file-modal-empty {
+  display: grid;
+  min-height: 180px;
+  place-items: center;
+  color: var(--muted);
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+.local-file-code {
+  margin: 0;
 }

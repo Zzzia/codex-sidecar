@@ -1,6 +1,7 @@
 import path from "node:path";
 import type {
   ProjectSummary,
+  ThreadDelta,
   ThreadPage,
   ThreadSnapshot,
   TimelineEvent,
@@ -64,7 +65,7 @@ export class CodexObserver {
       const summaries = await Promise.all(
         threadRows.map(async (row) => {
           const runtime = await this.ensureRuntime(row);
-          await runtime.ensureLoaded();
+          await runtime.refresh();
           return runtime.getSummary();
         }),
       );
@@ -100,7 +101,7 @@ export class CodexObserver {
     const items = await Promise.all(
       pageRows.map(async (row: ThreadRow) => {
         const runtime = await this.ensureRuntime(row);
-        await runtime.ensureLoaded();
+        await runtime.refresh();
         return runtime.getSummary();
       }),
     );
@@ -121,6 +122,11 @@ export class CodexObserver {
   async getEventsSince(threadId: string, cursor: number): Promise<TimelineEvent[]> {
     const runtime = await this.getRuntime(threadId);
     return runtime.getEventsSince(cursor);
+  }
+
+  async getThreadDelta(threadId: string, cursor: number): Promise<ThreadDelta> {
+    const runtime = await this.getRuntime(threadId);
+    return runtime.getDelta(cursor);
   }
 
   async subscribe(

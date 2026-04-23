@@ -3,6 +3,10 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { TimelineEvent } from "../shared/types.js";
+import {
+  LocalFilePreviewError,
+  previewLocalFile,
+} from "./localFilePreview.js";
 import { CodexObserver } from "./observer/CodexObserver.js";
 import { badRequest, json, notFound, serverError, writeSseEvent } from "./utils/http.js";
 
@@ -22,7 +26,7 @@ function getStaticContentType(filePath: string): string {
 }
 
 function readThreadId(urlPath: string): string | null {
-  const match = urlPath.match(/^\/api\/threads\/([^/]+)\/(snapshot|stream)$/);
+  const match = urlPath.match(/^\/api\/threads\/([^/]+)\/(snapshot|events|stream|file)$/);
   return match?.[1] ?? null;
 }
 
@@ -65,6 +69,42 @@ const server = createServer(async (request, response) => {
 
       const snapshot = await observer.getThreadSnapshot(threadId);
       json(response, 200, snapshot);
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname.endsWith("/file")) {
+      const threadId = readThreadId(url.pathname);
+      const href = url.searchParams.get("href");
+      if (!threadId || !href) {
+        badRequest(response, "Invalid file preview request");
+        return;
+      }
+
+      const snapshot = await observer.getThreadSnapshot(threadId);
+      try {
+        const preview = await previewLocalFile(snapshot.thread.cwd, href);
+        json(response, 200, preview);
+      } catch (error) {
+        if (error instanceof LocalFilePreviewError) {
+          json(response, error.statusCode, { error: error.message });
+          return;
+        }
+        throw error;
+      }
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname.endsWith("/events")) {
+      const threadId = readThreadId(url.pathname);
+      if (!threadId) {
+        badRequest(response, "Invalid thread id");
+        return;
+      }
+
+      const rawAfter = Number(url.searchParams.get("after") ?? "0");
+      const after = Number.isFinite(rawAfter) && rawAfter >= 0 ? rawAfter : 0;
+      const delta = await observer.getThreadDelta(threadId, after);
+      json(response, 200, delta);
       return;
     }
 
