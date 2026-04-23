@@ -81,6 +81,32 @@ export async function listCliThreadsByCwd(
   );
 }
 
+export async function countCliThreadsByCwds(
+  dbPath: string,
+  cwds: string[],
+): Promise<Record<string, number>> {
+  if (cwds.length === 0) {
+    return {};
+  }
+
+  const uniqueCwds = [...new Set(cwds)];
+  const rows = await runJsonQuery<{ cwd: string; total: number }>(
+    dbPath,
+    `
+      select
+        cwd,
+        count(*) as total
+      from threads
+      where source = 'cli'
+        and archived = 0
+        and cwd in (${uniqueCwds.map(escapeSqlText).join(", ")})
+      group by cwd
+    `,
+  );
+
+  return Object.fromEntries(rows.map((row) => [row.cwd, row.total]));
+}
+
 export async function findThreadById(
   dbPath: string,
   id: string,

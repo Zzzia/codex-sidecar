@@ -29,9 +29,6 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(() =>
     typeof window === "undefined" ? true : loadSidebarOpen(),
   );
-  const [activeOnlyByProject, setActiveOnlyByProject] = useState<Record<string, boolean>>(
-    {},
-  );
 
   useEffect(() => {
     saveWorkspaceState(workspace);
@@ -52,14 +49,7 @@ export default function App() {
         loading={projects.loading}
         error={projects.error}
         sidebarOpen={sidebarOpen}
-        activeOnlyByProject={activeOnlyByProject}
         onToggleSidebar={() => setSidebarOpen((current) => !current)}
-        onToggleProjectMode={(cwd) =>
-          setActiveOnlyByProject((current) => ({
-            ...current,
-            [cwd]: !current[cwd],
-          }))
-        }
         onOpenThread={(threadId) =>
           setWorkspace((current) => openThreadInWorkspace(current, threadId))
         }

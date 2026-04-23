@@ -1,0 +1,80 @@
+.load-more-button {
+  width: auto;
+  align-self: center;
+  margin-top: 5px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.load-more-button:hover,
+.load-more-button:focus-visible {
+  background: rgba(72, 54, 33, 0.055);
+  color: var(--text);
+}
+
+.load-more-button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.thread-section-menu {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.thread-section-menu:hover,
+.thread-section-menu:focus-visible {
+  background: rgba(72, 54, 33, 0.06);
+}
+
+.sidebar-copy-button {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 120ms ease,
+    color 120ms ease,
+    background 120ms ease;
+}
+
+.project-path-row:hover .sidebar-copy-button,
+.thread-row:hover .sidebar-copy-button,
+.thread-row:focus-visible .sidebar-copy-button {
+  opacity: 0.72;
+}
+
+.sidebar-copy-button:hover,
+.sidebar-copy-button:focus-visible {
+  background: rgba(72, 54, 33, 0.07);
+  color: var(--text);
+  opacity: 1;
+}
+
+.sidebar-copy-button.is-copied {
+  color: var(--accent);
+  opacity: 1;
+}

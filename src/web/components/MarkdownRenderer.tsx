@@ -1,6 +1,12 @@
-import { useEffect, useId, useState } from "react";
+import {
+  type ReactElement,
+  isValidElement,
+  type ReactNode,
+  useEffect,
+  useId,
+  useState,
+} from "react";
 import Markdown from "react-markdown";
-import rehypeHighlight from "rehype-highlight";
 import rehypeRaw from "rehype-raw";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
@@ -65,42 +71,152 @@ export function extractPlanText(text: string): string | null {
   return match?.[1]?.trim() ?? null;
 }
 
+function textFromReactNode(node: ReactNode): string {
+  if (node == null || typeof node === "boolean") {
+    return "";
+  }
+
+  if (typeof node === "string" || typeof node === "number") {
+    return String(node);
+  }
+
+  if (Array.isArray(node)) {
+    return node.map(textFromReactNode).join("");
+  }
+
+  if (isValidElement<{ children?: ReactNode }>(node)) {
+    return textFromReactNode(node.props.children);
+  }
+
+  return "";
+}
+
+function codeChildFromPre(
+  children: ReactNode,
+): ReactElement<{ className?: string; children?: ReactNode }> | null {
+  const child = Array.isArray(children)
+    ? children.find((item) => item != null && item !== "\n")
+    : children;
+
+  if (
+    isValidElement<{ className?: string; children?: ReactNode }>(child) &&
+    child.type === "code"
+  ) {
+    return child;
+  }
+
+  return null;
+}
+
+type MarkdownAstNode = {
+  type?: string;
+  value?: string;
+  lang?: string | null;
+  meta?: string | null;
+  children?: MarkdownAstNode[];
+  position?: {
+    start?: {
+      line?: number;
+    };
+  };
+};
+
+function visitMarkdownNode(
+  node: MarkdownAstNode,
+  visitor: (node: MarkdownAstNode) => void,
+) {
+  visitor(node);
+
+  for (const child of node.children ?? []) {
+    visitMarkdownNode(child, visitor);
+  }
+}
+
+function createRemarkUnwrapSingleLineIndentedCode(source: string) {
+  const lines = source.split(/\r?\n/);
+
+  return function remarkUnwrapSingleLineIndentedCode() {
+    return function transformer(tree: MarkdownAstNode) {
+      visitMarkdownNode(tree, (node) => {
+        if (node.type !== "code" || node.lang || node.meta) {
+          return;
+        }
+
+        const originalLine = lines[(node.position?.start?.line ?? 1) - 1] ?? "";
+        const isIndentedCode = /^(?: {4}|\t)/.test(originalLine);
+        const isSingleLine = !node.value?.includes("\n");
+
+        if (!isIndentedCode || !isSingleLine) {
+          return;
+        }
+
+        node.type = "paragraph";
+        node.children = [{ type: "text", value: node.value ?? "" }];
+        delete node.value;
+      });
+    };
+  };
+}
+
 export function MarkdownRenderer({ text }: { text: string }) {
   return (
     <Markdown
       className="markdown-body"
-      remarkPlugins={[remarkGfm, remarkBreaks]}
-      rehypePlugins={[rehypeRaw, rehypeHighlight]}
+      remarkPlugins={[
+        remarkGfm,
+        createRemarkUnwrapSingleLineIndentedCode(text),
+        remarkBreaks,
+      ]}
+      rehypePlugins={[rehypeRaw]}
       components={{
-        code(props) {
-          const { className, children, ...rest } = props;
-          const value = String(children);
-          const isBlock = value.includes("\n");
-          const match = /language-([\w-]+)/.exec(className ?? "");
+        pre(props) {
+          const { children, node, className, ...rest } = props;
+          const codeChild = codeChildFromPre(children);
+          const codeClassName = codeChild?.props.className ?? "";
+          const match = /(?:^|\s)language-([\w-]+)/.exec(codeClassName);
           const language = match?.[1];
 
-          if (isBlock && language === "mermaid") {
-            return <MermaidBlock chart={value.trim()} />;
-          }
-
-          if (isBlock) {
+          if (language === "mermaid") {
             return (
-              <pre className="code-block">
-                <code className={className} {...rest}>
-                  {value.replace(/\n$/, "")}
-                </code>
-              </pre>
+              <MermaidBlock
+                chart={textFromReactNode(codeChild?.props.children).trim()}
+              />
             );
           }
 
           return (
-            <code className="inline-code" {...rest}>
+            <pre
+              className={className ? `code-block ${className}` : "code-block"}
+              {...rest}
+            >
               {children}
+            </pre>
+          );
+        },
+        code(props) {
+          const { className, children, node, ...rest } = props;
+          const value = textFromReactNode(children);
+
+          return (
+            <code
+              className={className ? `inline-code ${className}` : "inline-code"}
+              {...rest}
+            >
+              {value.replace(/\n$/, "")}
             </code>
           );
         },
         a(props) {
-          return <a {...props} target="_blank" rel="noreferrer" />;
+          const { node, ...rest } = props;
+          return <a {...rest} target="_blank" rel="noreferrer" />;
+        },
+        table(props) {
+          const { children, node, ...rest } = props;
+          return (
+            <div className="markdown-table-scroll">
+              <table {...rest}>{children}</table>
+            </div>
+          );
         },
       }}
     >

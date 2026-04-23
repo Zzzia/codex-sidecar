@@ -6,6 +6,7 @@ import type {
   TimelineEvent,
 } from "../../shared/types.js";
 import {
+  countCliThreadsByCwds,
   findThreadById,
   listCliThreadsByCwd,
   listRecentCliThreads,
@@ -54,6 +55,10 @@ export class CodexObserver {
     }
 
     const projects: ProjectSummary[] = [];
+    const totalCounts = await countCliThreadsByCwds(
+      this.dbPath,
+      [...byProject.keys()],
+    );
 
     for (const [cwd, threadRows] of byProject.entries()) {
       const summaries = await Promise.all(
@@ -76,7 +81,7 @@ export class CodexObserver {
         activeThreadCount: summaries.filter(
           (item: { status: string }) => item.status === "running",
         ).length,
-        totalThreadCount: summaries.length,
+        totalThreadCount: totalCounts[cwd] ?? summaries.length,
         recentThreads: summaries.slice(0, 3),
       });
     }

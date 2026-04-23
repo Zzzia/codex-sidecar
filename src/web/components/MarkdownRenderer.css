@@ -26,7 +26,7 @@
 .markdown-body ol,
 .markdown-body blockquote,
 .markdown-body pre,
-.markdown-body table {
+.markdown-table-scroll {
   margin: 0.72em 0;
 }
 
@@ -91,7 +91,7 @@
 
 .markdown-body blockquote {
   padding-left: 1em;
-  border-left: 3px solid rgba(18, 110, 98, 0.22);
+  border-left: 3px solid rgba(63, 128, 91, 0.22);
   color: var(--muted);
 }
 
@@ -103,9 +103,71 @@
   max-width: 100%;
 }
 
-.markdown-body table {
-  display: block;
+.markdown-table-scroll {
+  max-width: 100%;
   overflow-x: auto;
+  overflow-y: hidden;
+  border: 1px solid rgba(45, 42, 36, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 252, 0.72);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(92, 84, 72, 0.28) transparent;
+}
+
+.markdown-table-scroll::-webkit-scrollbar {
+  height: 7px;
+}
+
+.markdown-table-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(92, 84, 72, 0.28);
+}
+
+.markdown-table-scroll table {
+  width: max-content;
+  min-width: 100%;
+  max-width: none;
+  margin: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.92em;
+}
+
+.markdown-table-scroll th,
+.markdown-table-scroll td {
+  padding: 7px 10px;
+  border-right: 1px solid rgba(45, 42, 36, 0.1);
+  border-bottom: 1px solid rgba(45, 42, 36, 0.1);
+  white-space: nowrap;
+  word-break: normal;
+  overflow-wrap: normal;
+  text-align: left !important;
+  vertical-align: top;
+}
+
+.markdown-table-scroll th {
+  background: rgba(238, 235, 228, 0.88);
+  color: var(--text);
+  font-weight: 650;
+}
+
+.markdown-table-scroll tr:last-child td {
+  border-bottom: 0;
+}
+
+.markdown-table-scroll th:last-child,
+.markdown-table-scroll td:last-child {
+  border-right: 0;
+}
+
+.markdown-table-scroll td > :first-child,
+.markdown-table-scroll th > :first-child {
+  margin-top: 0;
+}
+
+.markdown-table-scroll td > :last-child,
+.markdown-table-scroll th > :last-child {
+  margin-bottom: 0;
 }
 
 .markdown-body hr {

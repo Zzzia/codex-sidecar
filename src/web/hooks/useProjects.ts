@@ -140,11 +140,24 @@ export function useProjects(): ProjectsState {
       return;
     }
 
-    const params = new URLSearchParams({ cwd });
-    if (target.nextCursor) {
-      params.set("cursor", target.nextCursor);
+    let mergedThreads = target.loadedThreads;
+    let nextCursor = target.nextCursor;
+    const shouldFetchFirstPage =
+      !nextCursor && target.loadedThreads.length < target.totalThreadCount;
+
+    if (!nextCursor && !shouldFetchFirstPage) {
+      return;
     }
-    const data = await fetchJson<ThreadPage>(`/api/threads?${params.toString()}`);
+
+    do {
+      const params = new URLSearchParams({ cwd });
+      if (nextCursor) {
+        params.set("cursor", nextCursor);
+      }
+      const data = await fetchJson<ThreadPage>(`/api/threads?${params.toString()}`);
+      mergedThreads = mergeThreads(mergedThreads, data.items);
+      nextCursor = data.nextCursor;
+    } while (nextCursor);
 
     setItems((current) =>
       current.map((item) => {
@@ -153,8 +166,8 @@ export function useProjects(): ProjectsState {
         }
         return {
           ...item,
-          loadedThreads: mergeThreads(item.loadedThreads, data.items),
-          nextCursor: data.nextCursor,
+          loadedThreads: mergeThreads(item.loadedThreads, mergedThreads),
+          nextCursor,
         };
       }),
     );

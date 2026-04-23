@@ -1,24 +1,71 @@
 .turn-card {
   position: relative;
   margin: 0 14px;
-  padding: 18px 0 24px;
+  padding: 22px 0 26px;
   min-width: 0;
   max-width: calc(100% - 28px);
-  scroll-margin-top: 18px;
+  overflow-x: hidden;
+  scroll-margin-top: 22px;
 }
 
-.turn-card + .turn-card {
-  border-top: 1px solid rgba(72, 54, 33, 0.12);
+.turn-card.has-previous-turn {
+  border-top: 1px solid rgba(72, 54, 33, 0.16);
 }
 
 .turn-card-header {
-  margin: 0 20px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 0 20px 16px;
+  min-width: 0;
+}
+
+.turn-card-title-wrap {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+}
+
+.turn-card-status {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 999px;
+  background: rgba(107, 98, 85, 0.48);
+}
+
+.turn-card-status.status-running {
+  background: var(--running);
+}
+
+.turn-card-status.status-completed {
+  background: #207f5f;
+}
+
+.turn-card-status.status-error {
+  background: #9d978e;
 }
 
 .turn-card-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 0.78rem;
   font-weight: 400;
-  color: var(--muted);
+  line-height: 1.2;
+  color: inherit;
+}
+
+.turn-card-time {
+  flex: none;
+  color: rgba(107, 98, 85, 0.68);
+  font-size: 0.68rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 
 .turn-question,
@@ -37,6 +84,12 @@
   margin-top: 0;
 }
 
+.turn-question .markdown-body,
+.turn-answer .markdown-body {
+  font-size: 0.93rem;
+  line-height: 1.72;
+}
+
 .turn-tools + .turn-tools,
 .turn-tools + .turn-exploration,
 .turn-exploration + .turn-tools,
@@ -47,7 +100,7 @@
 .turn-question {
   padding: 16px 18px;
   border: none;
-  background: rgba(18, 110, 98, 0.05);
+  background: rgba(63, 128, 91, 0.05);
 }
 
 .turn-tool-list {
@@ -77,10 +130,10 @@
   align-items: center;
   justify-content: center;
   padding: 0;
-  border: 1px solid rgba(18, 110, 98, 0.16);
+  border: 1px solid rgba(63, 128, 91, 0.16);
   border-radius: 999px;
-  background: rgba(255, 252, 246, 0.78);
-  box-shadow: 0 10px 18px rgba(18, 110, 98, 0.1);
+  background: rgba(255, 255, 252, 0.78);
+  box-shadow: 0 10px 18px rgba(52, 48, 40, 0.1);
   color: var(--text);
   cursor: pointer;
   opacity: 0.62;
@@ -90,7 +143,7 @@
 .timeline-jump-button:hover,
 .timeline-jump-button:focus-visible {
   opacity: 1;
-  background: rgba(255, 252, 246, 0.92);
+  background: rgba(255, 255, 252, 0.92);
 }
 
 .tool-run-row {
@@ -119,7 +172,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 8px;
-  background: rgba(18, 110, 98, 0.06);
+  background: rgba(63, 128, 91, 0.06);
   color: var(--accent);
 }
 
@@ -176,7 +229,7 @@
   white-space: nowrap;
   padding: 2px 8px;
   border-radius: 999px;
-  background: rgba(18, 110, 98, 0.08);
+  background: rgba(63, 128, 91, 0.08);
   color: var(--accent);
   font-size: 0.74rem;
 }
@@ -263,7 +316,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: "IBM Plex Mono", "Fira Code", monospace;
+  font-family: var(--font-mono);
   font-size: 0.78rem;
   background: transparent;
   color: var(--text);
@@ -308,7 +361,7 @@
 }
 
 .exploration-row.is-running .exploration-meta {
-  color: var(--accent);
+  color: var(--running);
 }
 
 .exploration-row.is-error .exploration-summary,
@@ -329,9 +382,10 @@
 }
 
 .inline-patch-file {
-  border: 1px solid rgba(72, 54, 33, 0.08);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(45, 42, 36, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 252, 0.72);
+  overflow-x: hidden;
 }
 
 .inline-patch-file + .inline-patch-file {
@@ -339,7 +393,7 @@
 }
 
 .inline-patch-file[open] {
-  box-shadow: 0 8px 20px rgba(72, 54, 33, 0.08);
+  box-shadow: 0 6px 14px rgba(52, 48, 40, 0.08);
 }
 
 .inline-patch-header {
@@ -376,7 +430,7 @@
 .inline-patch-name {
   min-width: 0;
   color: var(--text);
-  font-family: "IBM Plex Mono", "Fira Code", monospace;
+  font-family: var(--font-mono);
   font-size: 0.8rem;
   line-height: 1.35;
   overflow: hidden;
@@ -397,7 +451,8 @@
 
 .inline-patch-body {
   padding: 0 14px 14px;
-  border-top: 1px solid rgba(72, 54, 33, 0.08);
+  border-top: 1px solid rgba(45, 42, 36, 0.08);
+  overflow-x: hidden;
 }
 
 .inline-patch-actions {
@@ -423,7 +478,12 @@
   margin: 0 0 10px;
   color: var(--muted);
   font-size: 0.78rem;
-  font-family: "IBM Plex Mono", "Fira Code", monospace;
+  font-family: var(--font-mono);
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.diff-viewer {
+  max-width: 100%;
+  overflow-x: hidden;
 }

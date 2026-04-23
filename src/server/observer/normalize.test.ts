@@ -241,6 +241,35 @@ test("normalizeRecord ignores token_count and agent_message duplicates", () => {
   assert.deepEqual(agentEvents, []);
 });
 
+test("normalizeRecord treats turn_aborted as a terminal non-active status", () => {
+  const context = {
+    row,
+    callNames: new Map<string, string>(),
+    status: "running" as const,
+  };
+  const events = normalizeRecord(
+    {
+      timestamp: "2026-04-22T08:00:03.000Z",
+      type: "event_msg",
+      payload: {
+        type: "turn_aborted",
+        reason: "interrupted",
+      },
+    },
+    context,
+    5,
+  );
+
+  assert.equal(context.status, "completed");
+  assert.equal(events.length, 1);
+  assert.equal(events[0]?.kind, "status");
+  if (events[0]?.kind !== "status") {
+    assert.fail("expected status event");
+  }
+  assert.equal(events[0].status, "completed");
+  assert.equal(events[0].title, "对话中断");
+});
+
 test("summarizeThreadText collapses whitespace and truncates long text", () => {
   const summary = summarizeThreadText(
     `第一行内容\n第二行内容 ${"很长".repeat(60)}`,

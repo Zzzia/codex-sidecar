@@ -346,6 +346,20 @@ export function normalizeRecord(
       ];
     }
 
+    if (type === "turn_aborted") {
+      context.status = "completed";
+      return [
+        {
+          id: createEventId(type, ts, lineNumber),
+          ts,
+          kind: "status",
+          status: "completed",
+          title: "对话中断",
+          detail: "当前回合已被用户中断",
+        },
+      ];
+    }
+
     if (type === "agent_message") {
       return [];
     }
