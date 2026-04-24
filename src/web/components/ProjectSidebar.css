@@ -1,20 +1,30 @@
 .project-sidebar {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 18;
+  width: 318px;
   border-right: 1px solid rgba(45, 42, 36, 0.1);
   background: rgba(247, 245, 240, 0.96);
   backdrop-filter: blur(18px);
-  transition: width 180ms ease;
+  box-shadow: 0 24px 60px rgba(42, 32, 23, 0.14);
+  transform: translateX(calc(-100% + 28px));
+  transition:
+    box-shadow 180ms ease,
+    transform 180ms ease;
   overflow: hidden;
   display: flex;
   flex-direction: column;
 }
 
 .project-sidebar.is-open {
-  width: 318px;
+  transform: translateX(0);
 }
 
 .project-sidebar.is-closed {
-  width: 28px;
   background: rgba(247, 245, 240, 0.74);
+  box-shadow: none;
 }
 
 .sidebar-header {
@@ -45,8 +55,11 @@
 }
 
 .sidebar-collapsed-trigger {
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 28px;
   flex: 1;
   display: grid;
   place-items: center;

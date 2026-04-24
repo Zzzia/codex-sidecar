@@ -1,13 +1,20 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  autoDistributeWorkspace,
   closeLeafInWorkspace,
   createInitialWorkspace,
   openThreadInWorkspace,
   swapWithSibling,
   toggleLeafCollapse,
+  toggleParentOrientation,
   updateSplitSizes,
 } from "./workspace.js";
+
+function assertSizesClose(actual: [number, number], expected: [number, number]) {
+  assert.ok(Math.abs(actual[0] - expected[0]) < 0.001);
+  assert.ok(Math.abs(actual[1] - expected[1]) < 0.001);
+}
 
 test("openThreadInWorkspace focuses existing pane instead of duplicating thread", () => {
   let state = createInitialWorkspace();
@@ -24,6 +31,20 @@ test("openThreadInWorkspace focuses existing pane instead of duplicating thread"
     child.type === "leaf" ? child.threadId : "nested",
   );
   assert.deepEqual(threadIds.sort(), ["thread-a", "thread-b"]);
+});
+
+test("openThreadInWorkspace distributes panes after adding a nested thread", () => {
+  let state = createInitialWorkspace();
+  state = openThreadInWorkspace(state, "thread-a");
+  state = openThreadInWorkspace(state, "thread-b");
+  state = openThreadInWorkspace(state, "thread-c");
+
+  if (state.root?.type !== "split" || state.root.children[1]?.type !== "split") {
+    assert.fail("expected nested split after opening third thread");
+  }
+
+  assertSizesClose(state.root.sizes, [100 / 3, 200 / 3]);
+  assert.deepEqual(state.root.children[1].sizes, [50, 50]);
 });
 
 test("toggleLeafCollapse shrinks and restores sibling layout", () => {
@@ -109,4 +130,45 @@ test("updateSplitSizes keeps workspace identity when layout does not change", ()
     assert.fail("expected split after layout update");
   }
   assert.deepEqual(changed.root.sizes, [45, 55]);
+});
+
+test("autoDistributeWorkspace balances nested panes and restores collapsed panes", () => {
+  let state = createInitialWorkspace();
+  state = openThreadInWorkspace(state, "thread-a");
+  state = openThreadInWorkspace(state, "thread-b");
+  state = openThreadInWorkspace(state, "thread-c");
+
+  if (state.root?.type !== "split" || state.root.children[1]?.type !== "split") {
+    assert.fail("expected nested split before auto distribution");
+  }
+
+  const nestedSplit = state.root.children[1];
+  if (nestedSplit.children[0].type !== "leaf") {
+    assert.fail("expected leaf inside nested split");
+  }
+
+  state = updateSplitSizes(state, state.root.id, [80, 20]);
+  state = toggleParentOrientation(state, nestedSplit.children[0].id);
+  state = toggleLeafCollapse(state, nestedSplit.children[0].id);
+
+  const balanced = autoDistributeWorkspace(state);
+  if (
+    balanced.root?.type !== "split" ||
+    balanced.root.children[1]?.type !== "split"
+  ) {
+    assert.fail("expected nested split after auto distribution");
+  }
+
+  assertSizesClose(balanced.root.sizes, [100 / 3, 200 / 3]);
+
+  const balancedNestedSplit = balanced.root.children[1];
+  assert.equal(balancedNestedSplit.orientation, "vertical");
+  assert.deepEqual(balancedNestedSplit.sizes, [50, 50]);
+  assert.equal(balancedNestedSplit.lastExpandedSizes, undefined);
+
+  const restoredLeaf = balancedNestedSplit.children[0];
+  if (restoredLeaf.type !== "leaf") {
+    assert.fail("expected restored leaf after auto distribution");
+  }
+  assert.equal(restoredLeaf.collapsed, false);
 });

@@ -20,6 +20,12 @@ import {
 } from "./TimelineInspectors";
 import { ExplorationRunList, ToolRunList } from "./TimelineRuns";
 import type { LocalFileContext } from "./localFilePreview";
+import {
+  findCurrentTurnCardIndex,
+  readTimelineScrollAnchor,
+  restoreTimelineScrollAnchor,
+  type TimelineScrollAnchor,
+} from "./timelineScrollAnchor";
 import { formatTimestamp } from "./timelineHelpers";
 
 type TimelineScrollBehavior = "auto" | "smooth";
@@ -125,6 +131,7 @@ function TurnCard({
   return (
     <article
       className={`turn-card ${index > 0 ? "has-previous-turn" : ""}`}
+      data-card-id={card.id}
       data-card-index={index}
     >
       <header className="turn-card-header">
@@ -192,55 +199,6 @@ function TimelineFooterSpacer() {
   return <div className="timeline-end-spacer" aria-hidden="true" />;
 }
 
-function findCurrentTurnCard(scroller: HTMLElement): HTMLElement | null {
-  const cards = Array.from(
-    scroller.querySelectorAll<HTMLElement>(".turn-card"),
-  );
-  if (cards.length === 0) {
-    return null;
-  }
-
-  const scrollerRect = scroller.getBoundingClientRect();
-  const viewportTop = scrollerRect.top + 8;
-  const viewportBottom = scrollerRect.bottom - 8;
-
-  let crossingTop: HTMLElement | null = null;
-  let crossingTopOffset = Number.NEGATIVE_INFINITY;
-  let firstVisibleBelow: HTMLElement | null = null;
-  let firstVisibleBelowOffset = Number.POSITIVE_INFINITY;
-
-  for (const card of cards) {
-    const rect = card.getBoundingClientRect();
-    if (rect.bottom <= viewportTop || rect.top >= viewportBottom) {
-      continue;
-    }
-
-    const offset = rect.top - scrollerRect.top;
-    if (rect.top <= viewportTop && offset > crossingTopOffset) {
-      crossingTop = card;
-      crossingTopOffset = offset;
-      continue;
-    }
-
-    if (offset < firstVisibleBelowOffset) {
-      firstVisibleBelow = card;
-      firstVisibleBelowOffset = offset;
-    }
-  }
-
-  return crossingTop ?? firstVisibleBelow ?? cards[0] ?? null;
-}
-
-function findCurrentTurnCardIndex(scroller: HTMLElement): number | null {
-  const card = findCurrentTurnCard(scroller);
-  if (!card) {
-    return null;
-  }
-
-  const value = Number(card.dataset.cardIndex ?? "");
-  return Number.isInteger(value) ? value : null;
-}
-
 export function Timeline({
   threadId,
   cwd,
@@ -261,6 +219,8 @@ export function Timeline({
   const didPrimeScrollRef = useRef(false);
   const followScrollPending = useRef(false);
   const visibleStartIndexRef = useRef(0);
+  const scrollAnchorRef = useRef<TimelineScrollAnchor | null>(null);
+  const followLatestRef = useRef(true);
   const [isAtTop, setIsAtTop] = useState(true);
   const [isAtBottom, setIsAtBottom] = useState(true);
   const [followLatest, setFollowLatest] = useState(true);
@@ -269,6 +229,8 @@ export function Timeline({
   useEffect(() => {
     didPrimeScrollRef.current = false;
     followScrollPending.current = false;
+    scrollAnchorRef.current = null;
+    followLatestRef.current = true;
     setIsAtTop(true);
     setIsAtBottom(true);
     setFollowLatest(true);
@@ -297,6 +259,10 @@ export function Timeline({
   };
 
   useEffect(() => {
+    followLatestRef.current = followLatest;
+  }, [followLatest]);
+
+  useEffect(() => {
     if (!followLatest || cards.length === 0 || events.length === 0) {
       return;
     }
@@ -323,6 +289,7 @@ export function Timeline({
         scrollerNode.scrollHeight - scrollerNode.clientHeight - scrollerNode.scrollTop;
       const atTop = scrollerNode.scrollTop <= 8;
       const atBottom = distanceToBottom <= 8;
+      scrollAnchorRef.current = readTimelineScrollAnchor(scrollerNode);
 
       setIsAtTop(atTop);
       setIsAtBottom(atBottom);
@@ -347,6 +314,70 @@ export function Timeline({
       window.removeEventListener("resize", syncScrollState);
     };
   }, [scrollerNode, cards.length]);
+
+  useEffect(() => {
+    if (!scrollerNode) {
+      return;
+    }
+
+    let frame: number | null = null;
+    let settleFrame: number | null = null;
+
+    const clearFrames = () => {
+      if (frame != null) {
+        window.cancelAnimationFrame(frame);
+        frame = null;
+      }
+      if (settleFrame != null) {
+        window.cancelAnimationFrame(settleFrame);
+        settleFrame = null;
+      }
+    };
+
+    const preserveAnchorAfterResize = () => {
+      const anchor =
+        scrollAnchorRef.current ?? readTimelineScrollAnchor(scrollerNode);
+      if (!anchor) {
+        return;
+      }
+
+      clearFrames();
+      frame = window.requestAnimationFrame(() => {
+        frame = null;
+
+        if (anchor.atBottom || followLatestRef.current) {
+          scrollerNode.scrollTop = scrollerNode.scrollHeight;
+          scrollAnchorRef.current = readTimelineScrollAnchor(scrollerNode);
+          return;
+        }
+
+        const restored = restoreTimelineScrollAnchor(scrollerNode, anchor);
+        if (!restored) {
+          listRef.current?.scrollToIndex({
+            index: Math.max(0, anchor.cardIndex),
+            align: "start",
+            behavior: "auto",
+          });
+        }
+
+        settleFrame = window.requestAnimationFrame(() => {
+          settleFrame = null;
+          if (!followLatestRef.current) {
+            restoreTimelineScrollAnchor(scrollerNode, anchor);
+          }
+          scrollAnchorRef.current = readTimelineScrollAnchor(scrollerNode);
+        });
+      });
+    };
+
+    const resizeObserver = new ResizeObserver(preserveAnchorAfterResize);
+    resizeObserver.observe(scrollerNode);
+
+    return () => {
+      resizeObserver.disconnect();
+      clearFrames();
+    };
+  }, [scrollerNode]);
 
   const jumpToBottom = () => {
     if (cards.length === 0) {

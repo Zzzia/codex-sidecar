@@ -10,12 +10,12 @@ import {
   type WorkspaceState,
 } from "@web/state/workspace";
 
-const SIDEBAR_OPEN_KEY = "codex-app.sidebar-open.v1";
+const SIDEBAR_OPEN_KEY = "codex-app.sidebar-pinned.v2";
 
 function loadSidebarOpen(): boolean {
   try {
     const raw = window.localStorage.getItem(SIDEBAR_OPEN_KEY);
-    return raw ? raw === "true" : true;
+    return raw ? raw === "true" : false;
   } catch {
     return true;
   }
@@ -57,7 +57,6 @@ export default function App() {
       />
       <WorkspaceView
         state={workspace}
-        sidebarOpen={sidebarOpen}
         onChange={onWorkspaceChange}
       />
     </main>

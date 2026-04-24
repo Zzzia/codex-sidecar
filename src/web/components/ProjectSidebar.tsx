@@ -1,4 +1,4 @@
-import { type KeyboardEvent, useEffect, useState } from "react";
+import { type FocusEvent, type KeyboardEvent, useEffect, useState } from "react";
 import {
   Activity,
   Check,
@@ -54,6 +54,8 @@ export function ProjectSidebar(props: ProjectSidebarProps) {
   const [activeProjectsOnly, setActiveProjectsOnly] = useState(false);
   const [selectedCwd, setSelectedCwd] = useState<string | null>(null);
   const [loadingAllCwd, setLoadingAllCwd] = useState<string | null>(null);
+  const [hoverExpanded, setHoverExpanded] = useState(false);
+  const sidebarExpanded = props.sidebarOpen || hoverExpanded;
 
   useEffect(() => {
     if (!copiedKey) {
@@ -135,9 +137,31 @@ export function ProjectSidebar(props: ProjectSidebarProps) {
     }
   };
 
+  const closeTransientSidebar = () => {
+    if (!props.sidebarOpen) {
+      setHoverExpanded(false);
+    }
+  };
+
+  const onSidebarBlur = (event: FocusEvent<HTMLElement>) => {
+    const nextTarget = event.relatedTarget;
+    if (nextTarget instanceof Node && event.currentTarget.contains(nextTarget)) {
+      return;
+    }
+    closeTransientSidebar();
+  };
+
   return (
-    <aside className={`project-sidebar ${props.sidebarOpen ? "is-open" : "is-closed"}`}>
-      {props.sidebarOpen ? (
+    <aside
+      className={`project-sidebar ${sidebarExpanded ? "is-open" : "is-closed"} ${
+        props.sidebarOpen ? "is-pinned" : "is-transient"
+      }`}
+      onMouseEnter={() => setHoverExpanded(true)}
+      onMouseLeave={closeTransientSidebar}
+      onFocus={() => setHoverExpanded(true)}
+      onBlur={onSidebarBlur}
+    >
+      {sidebarExpanded ? (
         <div className="sidebar-header">
           <div className="sidebar-app-title">
             <h1 title="codex-sidecar">codex-sidecar</h1>
@@ -145,9 +169,9 @@ export function ProjectSidebar(props: ProjectSidebarProps) {
           <button
             className="icon-button"
             onClick={props.onToggleSidebar}
-            title="收起侧栏"
+            title={props.sidebarOpen ? "隐藏侧栏" : "固定侧栏"}
           >
-            <ChevronLeft size={16} />
+            {props.sidebarOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
           </button>
         </div>
       ) : (
@@ -162,7 +186,7 @@ export function ProjectSidebar(props: ProjectSidebarProps) {
         </button>
       )}
 
-      {props.sidebarOpen ? (
+      {sidebarExpanded ? (
         <>
           {props.loading ? <div className="sidebar-empty">工程列表加载中…</div> : null}
           {props.error ? <div className="sidebar-error">{props.error}</div> : null}

@@ -4,6 +4,7 @@ import type {
   ThreadDelta,
   ThreadPage,
   ThreadSnapshot,
+  ThreadSummary,
   TimelineEvent,
 } from "../../shared/types.js";
 import {
@@ -117,6 +118,18 @@ export class CodexObserver {
   async getThreadSnapshot(threadId: string): Promise<ThreadSnapshot> {
     const runtime = await this.getRuntime(threadId);
     return runtime.getSnapshot();
+  }
+
+  async getThreadSummaries(threadIds: string[]): Promise<ThreadSummary[]> {
+    const uniqueThreadIds = [...new Set(threadIds)].slice(0, 100);
+    const settled = await Promise.allSettled(
+      uniqueThreadIds.map(async (threadId) => {
+        const runtime = await this.getRuntime(threadId);
+        await runtime.refresh();
+        return runtime.getSummary();
+      }),
+    );
+    return settled.flatMap((item) => (item.status === "fulfilled" ? [item.value] : []));
   }
 
   async getEventsSince(threadId: string, cursor: number): Promise<TimelineEvent[]> {

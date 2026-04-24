@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ProjectSummary, ThreadPage, ThreadSummary } from "@shared/types";
 
 interface ProjectRecord extends ProjectSummary {
@@ -72,10 +72,72 @@ function sameProjectRecords(first: ProjectRecord[], second: ProjectRecord[]): bo
   });
 }
 
+function mergeProjectSummaries(
+  projects: ProjectSummary[],
+  current: ProjectRecord[],
+): ProjectRecord[] {
+  const currentMap = new Map(current.map((item) => [item.cwd, item]));
+  return projects.map((project) => {
+    const existing = currentMap.get(project.cwd);
+    const merged = mergeThreads(
+      project.recentThreads,
+      existing?.loadedThreads ?? [],
+    );
+    return {
+      ...project,
+      loadedThreads: merged,
+      nextCursor: existing?.nextCursor ?? null,
+    };
+  });
+}
+
+function collectLoadedThreadIds(projects: ProjectRecord[]): string[] {
+  const ids = new Set<string>();
+  for (const project of projects) {
+    for (const thread of project.loadedThreads) {
+      ids.add(thread.id);
+    }
+  }
+  return [...ids].slice(0, 100);
+}
+
+function applyThreadSummaries(
+  projects: ProjectRecord[],
+  summaries: ThreadSummary[],
+): ProjectRecord[] {
+  if (summaries.length === 0) {
+    return projects;
+  }
+
+  const summaryMap = new Map(summaries.map((thread) => [thread.id, thread]));
+  const updateThread = (thread: ThreadSummary): ThreadSummary =>
+    summaryMap.get(thread.id) ?? thread;
+
+  return projects.map((project) => {
+    const recentThreads = project.recentThreads.map(updateThread);
+    const loadedThreads = mergeThreads(project.loadedThreads.map(updateThread), recentThreads);
+    return {
+      ...project,
+      activeThreadCount: loadedThreads.filter((thread) => thread.status === "running").length,
+      latestUpdatedAt: Math.max(
+        project.latestUpdatedAt,
+        ...loadedThreads.map((thread) => thread.updatedAt),
+      ),
+      recentThreads,
+      loadedThreads,
+    };
+  });
+}
+
 export function useProjects(): ProjectsState {
   const [items, setItems] = useState<ProjectRecord[]>([]);
+  const itemsRef = useRef<ProjectRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
 
   useEffect(() => {
     let cancelled = false;
@@ -90,22 +152,29 @@ export function useProjects(): ProjectsState {
           return;
         }
 
-        setItems((current) => {
-          const currentMap = new Map(current.map((item) => [item.cwd, item]));
-          const nextItems = data.items.map((project) => {
-            const existing = currentMap.get(project.cwd);
-            const merged = mergeThreads(
-              project.recentThreads,
-              existing?.loadedThreads ?? [],
-            );
-            return {
-              ...project,
-              loadedThreads: merged,
-              nextCursor: existing?.nextCursor ?? null,
-            };
-          });
+        const mergedProjects = mergeProjectSummaries(data.items, itemsRef.current);
+        const summaryIds = collectLoadedThreadIds(mergedProjects);
+        const summaryParams = new URLSearchParams();
+        for (const id of summaryIds) {
+          summaryParams.append("id", id);
+        }
+        const summaryData =
+          summaryIds.length > 0
+            ? await fetchJson<{ items: ThreadSummary[] }>(
+                `/api/thread-summaries?${summaryParams.toString()}`,
+              )
+            : { items: [] };
+        if (cancelled) {
+          return;
+        }
 
-          return sameProjectRecords(current, nextItems) ? current : nextItems;
+        setItems((currentItems) => {
+          const nextItems = applyThreadSummaries(
+            mergeProjectSummaries(data.items, currentItems),
+            summaryData.items,
+          );
+          itemsRef.current = nextItems;
+          return sameProjectRecords(currentItems, nextItems) ? currentItems : nextItems;
         });
         setError(null);
       } catch (requestError) {

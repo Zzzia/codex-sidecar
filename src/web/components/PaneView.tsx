@@ -5,6 +5,7 @@ import {
   Maximize2,
   Minimize2,
   MoreVertical,
+  PanelsTopLeft,
   X,
 } from "lucide-react";
 import type { ThreadStatus } from "@shared/types";
@@ -15,15 +16,20 @@ import { Timeline } from "./Timeline";
 import "./PaneView.css";
 
 export interface PaneViewProps {
+  paneId: string;
   threadId: string;
   collapsed: boolean;
   suspended: boolean;
   active: boolean;
+  floating: boolean;
+  floatingClosing: boolean;
   onSelect: () => void;
   onClose: () => void;
   onToggleCollapse: () => void;
   onSwap: () => void;
   onToggleOrientation: () => void;
+  onAutoDistribute: () => void;
+  onToggleFloating: () => void;
 }
 
 const PaneContent = memo(function PaneContent({
@@ -80,11 +86,17 @@ export function PaneView(props: PaneViewProps) {
     setMenuOpen(false);
   };
 
-  return (
+  const renderPaneSection = (variant: "inline" | "floating") => {
+    const isFloatingVariant = variant === "floating";
+
+    return (
     <section
       className={`pane-view ${props.active ? "is-active" : ""} ${
         props.collapsed ? "is-collapsed" : ""
+      } ${isFloatingVariant ? "is-floating" : ""} ${
+        isFloatingVariant && props.floatingClosing ? "is-closing" : ""
       }`}
+      data-pane-id={isFloatingVariant ? undefined : props.paneId}
       onMouseDown={props.onSelect}
     >
       <header className="pane-header">
@@ -130,6 +142,16 @@ export function PaneView(props: PaneViewProps) {
                   role="menuitem"
                   onClick={(event) => {
                     event.stopPropagation();
+                    runMenuAction(props.onAutoDistribute);
+                  }}
+                >
+                  <PanelsTopLeft size={14} />
+                  <span>自动分配大小</span>
+                </button>
+                <button
+                  role="menuitem"
+                  onClick={(event) => {
+                    event.stopPropagation();
                     runMenuAction(props.onSwap);
                   }}
                 >
@@ -149,6 +171,20 @@ export function PaneView(props: PaneViewProps) {
                     <Minimize2 size={14} />
                   )}
                   <span>{props.collapsed ? "展开分屏" : "折叠分屏"}</span>
+                </button>
+                <button
+                  role="menuitem"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    runMenuAction(props.onToggleFloating);
+                  }}
+                >
+                  {props.floating ? (
+                    <Minimize2 size={14} />
+                  ) : (
+                    <Maximize2 size={14} />
+                  )}
+                  <span>{props.floating ? "退出浮窗" : "全屏浮窗"}</span>
                 </button>
               </div>
             ) : null}
@@ -179,5 +215,13 @@ export function PaneView(props: PaneViewProps) {
         </div>
       ) : null}
     </section>
+    );
+  };
+
+  return (
+    <>
+      {renderPaneSection("inline")}
+      {props.floating || props.floatingClosing ? renderPaneSection("floating") : null}
+    </>
   );
 }

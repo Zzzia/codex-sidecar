@@ -60,6 +60,23 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    if (request.method === "GET" && url.pathname === "/api/thread-summaries") {
+      const ids = url.searchParams
+        .getAll("id")
+        .flatMap((value) => value.split(","))
+        .map((value) => value.trim())
+        .filter(Boolean)
+        .slice(0, 100);
+      if (ids.length === 0) {
+        badRequest(response, "Missing thread ids");
+        return;
+      }
+
+      const summaries = await observer.getThreadSummaries(ids);
+      json(response, 200, { items: summaries });
+      return;
+    }
+
     if (request.method === "GET" && url.pathname.endsWith("/snapshot")) {
       const threadId = readThreadId(url.pathname);
       if (!threadId) {

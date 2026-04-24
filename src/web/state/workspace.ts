@@ -112,6 +112,12 @@ interface ParentSearchResult {
   index: 0 | 1;
 }
 
+interface DistributedNode {
+  node: WorkspaceNode;
+  leafCount: number;
+  changed: boolean;
+}
+
 function findParent(
   node: WorkspaceNode | null,
   leafId: string,
@@ -198,6 +204,60 @@ function firstLeafId(node: WorkspaceNode | null): string | null {
   return firstLeafId(node.children[0]) ?? firstLeafId(node.children[1]);
 }
 
+function sizesChanged(
+  currentSizes: [number, number],
+  nextSizes: [number, number],
+): boolean {
+  return (
+    Math.abs(currentSizes[0] - nextSizes[0]) > LAYOUT_SIZE_EPSILON ||
+    Math.abs(currentSizes[1] - nextSizes[1]) > LAYOUT_SIZE_EPSILON
+  );
+}
+
+function distributeNodeEvenly(node: WorkspaceNode): DistributedNode {
+  if (node.type === "leaf") {
+    return {
+      node: node.collapsed ? { ...node, collapsed: false } : node,
+      leafCount: 1,
+      changed: node.collapsed,
+    };
+  }
+
+  const left = distributeNodeEvenly(node.children[0]);
+  const right = distributeNodeEvenly(node.children[1]);
+  const leafCount = left.leafCount + right.leafCount;
+  const nextSizes: [number, number] = [
+    (left.leafCount / leafCount) * 100,
+    (right.leafCount / leafCount) * 100,
+  ];
+  const splitChanged =
+    left.changed ||
+    right.changed ||
+    sizesChanged(node.sizes, nextSizes) ||
+    node.lastExpandedSizes !== undefined;
+
+  if (!splitChanged) {
+    return {
+      node,
+      leafCount,
+      changed: false,
+    };
+  }
+
+  return {
+    node: {
+      type: "split",
+      id: node.id,
+      orientation: node.orientation,
+      sizes: nextSizes,
+      revision: node.revision + 1,
+      children: [left.node, right.node],
+    },
+    leafCount,
+    changed: true,
+  };
+}
+
 export function createInitialWorkspace(): WorkspaceState {
   return {
     root: null,
@@ -230,7 +290,9 @@ export function openThreadInWorkspace(
     return state;
   }
 
-  const nextRoot = replaceLeafWithSplit(state.root, targetLeafId, threadId);
+  const nextRoot = distributeNodeEvenly(
+    replaceLeafWithSplit(state.root, targetLeafId, threadId),
+  ).node;
 
   return {
     root: nextRoot,
@@ -256,6 +318,22 @@ export function closeLeafInWorkspace(
   return {
     root,
     activeLeafId: firstLeafId(root),
+  };
+}
+
+export function autoDistributeWorkspace(state: WorkspaceState): WorkspaceState {
+  if (!state.root) {
+    return state;
+  }
+
+  const distributed = distributeNodeEvenly(state.root);
+  if (!distributed.changed) {
+    return state;
+  }
+
+  return {
+    ...state,
+    root: distributed.node,
   };
 }
 

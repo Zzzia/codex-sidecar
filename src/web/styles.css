@@ -56,8 +56,9 @@ a {
 
 .app-shell {
   height: 100%;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  position: relative;
+  display: block;
+  padding-left: 28px;
   overflow: hidden;
   min-width: 0;
 }
@@ -115,10 +116,46 @@ a {
 }
 
 .workspace-root {
+  position: relative;
   padding: 12px;
   width: 100%;
   max-width: 100%;
   overflow: hidden;
+}
+
+.workspace-floating-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 21;
+  border: 0;
+  background: rgba(42, 32, 23, 0.22);
+  cursor: default;
+  animation: workspace-floating-backdrop-in 180ms ease;
+}
+
+.workspace-floating-backdrop.is-closing {
+  pointer-events: none;
+  animation: workspace-floating-backdrop-out 140ms ease-in forwards;
+}
+
+@keyframes workspace-floating-backdrop-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes workspace-floating-backdrop-out {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
 }
 
 .workspace-group {
