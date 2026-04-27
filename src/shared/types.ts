@@ -41,7 +41,12 @@ export interface ThreadPage {
   nextCursor: string | null;
 }
 
-export type LocalFilePreviewKind = "markdown" | "code" | "unsupported";
+export type LocalFilePreviewKind =
+  | "markdown"
+  | "code"
+  | "image"
+  | "pdf"
+  | "unsupported";
 
 export interface LocalFilePreview {
   path: string;
@@ -49,6 +54,8 @@ export interface LocalFilePreview {
   kind: LocalFilePreviewKind;
   size: number;
   content?: string;
+  mimeType?: string;
+  dataUrl?: string;
   reason?: string;
 }
 

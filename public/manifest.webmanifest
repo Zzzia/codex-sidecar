@@ -1,0 +1,35 @@
+{
+  "id": "/",
+  "name": "Codex Sidecar",
+  "short_name": "Sidecar",
+  "description": "面向本地 Codex CLI 的观察与阅读工作台。",
+  "lang": "zh-CN",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f5f0e8",
+  "theme_color": "#f5f0e8",
+  "categories": ["productivity", "developer"],
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "/icons/codex-sidecar-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/codex-sidecar-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/codex-sidecar-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

@@ -6,9 +6,22 @@ import type {
   LocalFilePreviewKind,
 } from "../shared/types.js";
 
-const MAX_PREVIEW_BYTES = 1_000_000;
+const MAX_TEXT_PREVIEW_BYTES = 1_000_000;
+const MAX_EMBED_PREVIEW_BYTES = 8_000_000;
 
 const MARKDOWN_EXTENSIONS = new Set([".md", ".markdown", ".mdx"]);
+
+const IMAGE_MIME_TYPES = new Map<string, string>([
+  [".avif", "image/avif"],
+  [".bmp", "image/bmp"],
+  [".gif", "image/gif"],
+  [".ico", "image/x-icon"],
+  [".jpeg", "image/jpeg"],
+  [".jpg", "image/jpeg"],
+  [".png", "image/png"],
+  [".svg", "image/svg+xml"],
+  [".webp", "image/webp"],
+]);
 
 const CODE_EXTENSIONS = new Set([
   ".bash",
@@ -44,7 +57,6 @@ const CODE_EXTENSIONS = new Set([
   ".sh",
   ".sql",
   ".svelte",
-  ".svg",
   ".swift",
   ".toml",
   ".ts",
@@ -109,6 +121,17 @@ function hrefToPath(cwd: string, href: string): string {
     : path.resolve(cwd, trimmedHref);
 }
 
+function mimeTypeForPath(filePath: string): string | null {
+  const extension = path.extname(filePath).toLowerCase();
+  if (IMAGE_MIME_TYPES.has(extension)) {
+    return IMAGE_MIME_TYPES.get(extension) ?? null;
+  }
+  if (extension === ".pdf") {
+    return "application/pdf";
+  }
+  return null;
+}
+
 function stripLineSuffix(filePath: string): string {
   return filePath.replace(/:\d+(?::\d+)?$/, "");
 }
@@ -127,10 +150,22 @@ function previewKindForPath(filePath: string): LocalFilePreviewKind {
   if (MARKDOWN_EXTENSIONS.has(extension)) {
     return "markdown";
   }
+  if (IMAGE_MIME_TYPES.has(extension)) {
+    return "image";
+  }
+  if (extension === ".pdf") {
+    return "pdf";
+  }
   if (CODE_EXTENSIONS.has(extension) || CODE_FILENAMES.has(basename)) {
     return "code";
   }
   return "unsupported";
+}
+
+function maxBytesForKind(kind: LocalFilePreviewKind): number {
+  return kind === "image" || kind === "pdf"
+    ? MAX_EMBED_PREVIEW_BYTES
+    : MAX_TEXT_PREVIEW_BYTES;
 }
 
 export async function previewLocalFile(
@@ -162,10 +197,6 @@ export async function previewLocalFile(
   if (!fileStat.isFile()) {
     throw new LocalFilePreviewError("Only regular files can be previewed", 400);
   }
-  if (fileStat.size > MAX_PREVIEW_BYTES) {
-    throw new LocalFilePreviewError("File is too large to preview", 413);
-  }
-
   const displayPath = path.relative(normalizedCwd, targetPath) || path.basename(targetPath);
   const kind = previewKindForPath(targetPath);
   if (kind === "unsupported") {
@@ -174,7 +205,26 @@ export async function previewLocalFile(
       displayPath,
       kind,
       size: fileStat.size,
-      reason: "This file type is not previewable",
+      reason: "这个文件类型暂不支持预览",
+    };
+  }
+  if (fileStat.size > maxBytesForKind(kind)) {
+    throw new LocalFilePreviewError("File is too large to preview", 413);
+  }
+
+  if (kind === "image" || kind === "pdf") {
+    const mimeType = mimeTypeForPath(targetPath);
+    if (!mimeType) {
+      throw new LocalFilePreviewError("File type is not previewable", 400);
+    }
+    const fileBuffer = await readFile(realTargetPath);
+    return {
+      path: targetPath,
+      displayPath,
+      kind,
+      size: fileStat.size,
+      mimeType,
+      dataUrl: `data:${mimeType};base64,${fileBuffer.toString("base64")}`,
     };
   }
 

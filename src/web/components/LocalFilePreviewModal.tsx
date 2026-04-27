@@ -15,6 +15,25 @@ function formatBytes(size: number): string {
   return `${(size / 1024 / 1024).toFixed(1)} MB`;
 }
 
+function previewKindLabel(state: LocalFilePreviewState): string {
+  if (state.status !== "ready") {
+    return state.status === "loading" ? "读取中" : "无法预览";
+  }
+  if (state.preview.kind === "markdown") {
+    return "Markdown";
+  }
+  if (state.preview.kind === "code") {
+    return "代码";
+  }
+  if (state.preview.kind === "image") {
+    return "图片";
+  }
+  if (state.preview.kind === "pdf") {
+    return "PDF";
+  }
+  return "不可预览";
+}
+
 export function LocalFilePreviewModal({
   context,
   state,
@@ -28,15 +47,9 @@ export function LocalFilePreviewModal({
 }) {
   const title =
     state.status === "ready" ? state.preview.displayPath : state.href;
-  const readyKind =
-    state.status === "ready" && state.preview.kind === "markdown"
-      ? "Markdown"
-      : state.status === "ready" && state.preview.kind === "code"
-        ? "代码"
-        : "不可预览";
   const meta =
     state.status === "ready"
-      ? `${readyKind} · ${formatBytes(state.preview.size)}`
+      ? `${previewKindLabel(state)} · ${formatBytes(state.preview.size)}`
       : state.status === "loading"
         ? "正在读取本地文件"
         : "无法预览";
@@ -84,6 +97,28 @@ export function LocalFilePreviewModal({
             <pre className="code-block local-file-code">
               <code>{state.preview.content ?? ""}</code>
             </pre>
+          ) : null}
+
+          {state.status === "ready" && state.preview.kind === "image" ? (
+            state.preview.dataUrl ? (
+              <div className="local-file-media-frame">
+                <img src={state.preview.dataUrl} alt={state.preview.displayPath} />
+              </div>
+            ) : (
+              <div className="local-file-modal-empty">图片内容为空，无法预览</div>
+            )
+          ) : null}
+
+          {state.status === "ready" && state.preview.kind === "pdf" ? (
+            state.preview.dataUrl ? (
+              <iframe
+                className="local-file-pdf-frame"
+                src={state.preview.dataUrl}
+                title={state.preview.displayPath}
+              />
+            ) : (
+              <div className="local-file-modal-empty">PDF 内容为空，无法预览</div>
+            )
           ) : null}
         </div>
       </div>

@@ -15,6 +15,9 @@ async function createWorkspace(): Promise<string> {
   await writeFile(path.join(workspace, "README.md"), "# Hello\n");
   await writeFile(path.join(workspace, "src", "main.ts"), "export const value = 1;\n");
   await writeFile(path.join(workspace, "image.png"), "fake");
+  await writeFile(path.join(workspace, "diagram.svg"), "<svg></svg>");
+  await writeFile(path.join(workspace, "report.pdf"), "%PDF-1.4\n");
+  await writeFile(path.join(workspace, "archive.bin"), "unknown");
   return workspace;
 }
 
@@ -54,6 +57,26 @@ test("previewLocalFile supports file urls inside cwd", async (t) => {
   assert.equal(preview.displayPath, "README.md");
 });
 
+test("previewLocalFile embeds common image and pdf files", async (t) => {
+  const workspace = await createWorkspace();
+  t.after(() => rm(workspace, { recursive: true, force: true }));
+
+  const image = await previewLocalFile(workspace, "image.png");
+  assert.equal(image.kind, "image");
+  assert.equal(image.mimeType, "image/png");
+  assert.match(image.dataUrl ?? "", /^data:image\/png;base64,/);
+  assert.equal(image.content, undefined);
+
+  const svg = await previewLocalFile(workspace, "diagram.svg");
+  assert.equal(svg.kind, "image");
+  assert.equal(svg.mimeType, "image/svg+xml");
+
+  const pdf = await previewLocalFile(workspace, "report.pdf");
+  assert.equal(pdf.kind, "pdf");
+  assert.equal(pdf.mimeType, "application/pdf");
+  assert.match(pdf.dataUrl ?? "", /^data:application\/pdf;base64,/);
+});
+
 test("previewLocalFile rejects paths outside cwd", async (t) => {
   const workspace = await createWorkspace();
   t.after(() => rm(workspace, { recursive: true, force: true }));
@@ -85,8 +108,9 @@ test("previewLocalFile returns unsupported result without reading unknown files"
   const workspace = await createWorkspace();
   t.after(() => rm(workspace, { recursive: true, force: true }));
 
-  const preview = await previewLocalFile(workspace, "image.png");
+  const preview = await previewLocalFile(workspace, "archive.bin");
 
   assert.equal(preview.kind, "unsupported");
   assert.equal(preview.content, undefined);
+  assert.equal(preview.dataUrl, undefined);
 });

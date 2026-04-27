@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { ArrowUp, X } from "lucide-react";
 import type { PatchRunView, ExplorationStepView, ToolRunView } from "@web/lib/turns";
 import { DiffViewer } from "./DiffViewer";
@@ -10,6 +11,13 @@ import {
 
 function toolLabel(name: string): string {
   return name === "exec_command" ? "Run" : name;
+}
+
+function renderPageModal(content: ReactNode): ReactNode {
+  if (typeof document === "undefined") {
+    return content;
+  }
+  return createPortal(content, document.body);
 }
 
 export function PatchPreview({
@@ -218,7 +226,7 @@ export function ToolDetailsModal({
   tool: ToolRunView;
   onClose: () => void;
 }) {
-  return (
+  return renderPageModal(
     <div className="tool-modal-backdrop" onClick={onClose}>
       <div
         className="tool-modal"
@@ -244,7 +252,7 @@ export function ToolDetailsModal({
 
         <ToolRunDetails tool={tool} />
       </div>
-    </div>
+    </div>,
   );
 }
 
@@ -255,7 +263,7 @@ export function ExplorationDetailsModal({
   step: ExplorationStepView;
   onClose: () => void;
 }) {
-  return (
+  return renderPageModal(
     <div className="tool-modal-backdrop" onClick={onClose}>
       <div
         className="tool-modal"
@@ -285,6 +293,6 @@ export function ExplorationDetailsModal({
           </div>
         ))}
       </div>
-    </div>
+    </div>,
   );
 }

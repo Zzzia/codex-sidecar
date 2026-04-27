@@ -37,7 +37,9 @@
 .markdown-body ul,
 .markdown-body ol {
   list-style-position: outside;
-  padding-inline-start: 1.5em;
+  margin-inline-start: 0;
+  overflow: visible;
+  padding-inline-start: 2em;
 }
 
 .markdown-body ul {
@@ -50,10 +52,12 @@
 
 .markdown-body ol {
   list-style-type: decimal;
+  padding-inline-start: 2.35em;
 }
 
 .markdown-body ol ol {
   list-style-type: lower-alpha;
+  padding-inline-start: 2.6em;
 }
 
 .markdown-body li {
@@ -272,4 +276,25 @@
 
 .local-file-code {
   margin: 0;
+}
+
+.local-file-media-frame {
+  display: grid;
+  min-height: 280px;
+  place-items: center;
+}
+
+.local-file-media-frame img {
+  display: block;
+  max-width: 100%;
+  max-height: min(680px, calc(100vh - 170px));
+  object-fit: contain;
+}
+
+.local-file-pdf-frame {
+  width: 100%;
+  min-height: min(720px, calc(100vh - 170px));
+  border: 1px solid rgba(72, 54, 33, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 252, 0.72);
 }
