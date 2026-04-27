@@ -14,6 +14,26 @@ test("prepareDiffView synthesizes headers for hunk-only updates", () => {
   assert.equal(prepared.diffFile?.unifiedLineLength, 2);
 });
 
+test("prepareDiffView renders hunk-only updates ending with a blank context line", () => {
+  const prepared = prepareDiffView(
+    "Halo/app/build.gradle.kts",
+    [
+      "@@ -15,4 +15,4 @@",
+      "         targetSdk = 35",
+      '-        versionCode = 4',
+      '-        versionName = "1.1"',
+      '+        versionCode = 5',
+      '+        versionName = "1.2"',
+      " ",
+    ].join("\n"),
+    "update",
+  );
+
+  assert.ok(prepared.diffFile);
+  assert.equal(prepared.note, null);
+  assert.equal(prepared.diffFile?.unifiedLineLength, 6);
+});
+
 test("prepareDiffView strips trailing move notes from unified diffs", () => {
   const prepared = prepareDiffView(
     "src/demo.ts",

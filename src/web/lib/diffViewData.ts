@@ -123,12 +123,13 @@ export function prepareDiffView(
 
   try {
     const lines = diffText.split("\n");
+    const parserDiffText = diffText.endsWith("\n") ? diffText : `${diffText}\n`;
     const diffFile = new DiffFile(
       headerFileName(lines[0] ?? "", fileName),
       "",
       headerFileName(lines[1] ?? "", fileName),
       "",
-      [diffText],
+      [parserDiffText],
     );
     diffFile.initTheme("light");
     diffFile.initRaw();
