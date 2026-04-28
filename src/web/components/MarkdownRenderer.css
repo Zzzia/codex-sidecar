@@ -190,17 +190,17 @@
 .local-file-modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 50;
+  z-index: 70;
   display: grid;
   place-items: center;
-  padding: 22px;
+  padding: 18px;
   background: rgba(42, 32, 23, 0.26);
   backdrop-filter: blur(7px);
 }
 
 .local-file-modal {
-  width: min(980px, 100%);
-  max-height: min(820px, calc(100vh - 44px));
+  width: min(1180px, calc(100vw - 36px));
+  max-height: min(920px, calc(100vh - 36px));
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -287,13 +287,13 @@
 .local-file-media-frame img {
   display: block;
   max-width: 100%;
-  max-height: min(680px, calc(100vh - 170px));
+  max-height: min(780px, calc(100vh - 150px));
   object-fit: contain;
 }
 
 .local-file-pdf-frame {
   width: 100%;
-  min-height: min(720px, calc(100vh - 170px));
+  min-height: min(820px, calc(100vh - 150px));
   border: 1px solid rgba(72, 54, 33, 0.12);
   border-radius: 12px;
   background: rgba(255, 255, 252, 0.72);

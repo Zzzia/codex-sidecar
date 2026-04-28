@@ -173,7 +173,11 @@ function TurnCard({
           return (
             <section key={block.id} className="turn-patches">
               {block.items.map((item) => (
-                <InlinePatchRun key={item.id} item={item} />
+                <InlinePatchRun
+                  key={item.id}
+                  item={item}
+                  localFileContext={localFileContext}
+                />
               ))}
             </section>
           );
@@ -471,6 +475,7 @@ export function Timeline({
       {selectedItem?.kind === "tool" ? (
         <ToolDetailsModal
           tool={selectedItem.tool}
+          localFileContext={localFileContext}
           onClose={() => setSelectedItem(null)}
         />
       ) : null}
@@ -478,6 +483,7 @@ export function Timeline({
       {selectedItem?.kind === "exploration" ? (
         <ExplorationDetailsModal
           step={selectedItem.step}
+          localFileContext={localFileContext}
           onClose={() => setSelectedItem(null)}
         />
       ) : null}

@@ -5,12 +5,14 @@ import {
   type MouseEvent,
 } from "react";
 import Markdown from "react-markdown";
+import rehypeHighlight from "rehype-highlight";
 import rehypeRaw from "rehype-raw";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import {
   codeChildFromPre,
   codeLanguageFromClassName,
+  splitCodeLines,
   textFromReactNode,
 } from "./MarkdownRenderer.helpers";
 import { LocalFilePreviewModal } from "./LocalFilePreviewModal";
@@ -20,11 +22,25 @@ import {
   type LocalFileContext,
   type LocalFilePreviewState,
 } from "./localFilePreview";
-import "./MarkdownRenderer.css";
+import { createCodePreviewMarkdown } from "./codePreviewMarkdown";
 
 const mermaidSvgCache = new Map<string, string>();
 const mermaidRenderCache = new Map<string, Promise<string>>();
 const MERMAID_CACHE_LIMIT = 80;
+const rehypeHighlightPlugin: [
+  typeof rehypeHighlight,
+  { detect: boolean; plainText: string[] },
+] = [
+  rehypeHighlight,
+  {
+    detect: false,
+    plainText: ["text", "txt", "plaintext", "plain"],
+  },
+];
+const rehypePlugins = [
+  rehypeRaw,
+  rehypeHighlightPlugin,
+];
 let mermaidInitialized = false;
 
 function rememberMermaidSvg(chart: string, svg: string): void {
@@ -190,12 +206,22 @@ function createRemarkUnwrapSingleLineIndentedCode(source: string) {
   };
 }
 
+function joinClassNames(...names: Array<string | null | undefined | false>): string {
+  return names.filter(Boolean).join(" ");
+}
+
+function isBlockCodeClassName(className?: string): boolean {
+  return /(?:^|\s)(?:hljs|language-|lang-)/.test(className ?? "");
+}
+
 export function MarkdownRenderer({
   text,
   localFileContext,
+  codeBlockLineNumbers = false,
 }: {
   text: string;
   localFileContext?: LocalFileContext | null;
+  codeBlockLineNumbers?: boolean;
 }) {
   const [filePreviewState, setFilePreviewState] =
     useState<LocalFilePreviewState | null>(null);
@@ -233,12 +259,17 @@ export function MarkdownRenderer({
           createRemarkUnwrapSingleLineIndentedCode(text),
           remarkBreaks,
         ]}
-        rehypePlugins={[rehypeRaw]}
+        rehypePlugins={rehypePlugins}
         components={{
           pre(props) {
             const { children, node, className, ...rest } = props;
             const codeChild = codeChildFromPre(children);
             const language = codeLanguageFromClassName(codeChild?.props.className);
+            const preClassName = joinClassNames(
+              "code-block",
+              className,
+              codeBlockLineNumbers && "code-block-with-lines",
+            );
 
             if (language === "mermaid") {
               return (
@@ -248,11 +279,31 @@ export function MarkdownRenderer({
               );
             }
 
+            if (codeBlockLineNumbers && codeChild) {
+              return (
+                <pre className={preClassName} {...rest}>
+                  <code className={codeChild.props.className}>
+                    {splitCodeLines(codeChild.props.children).map((line, index) => (
+                      <span
+                        className="code-line"
+                        data-line={index + 1}
+                        key={index}
+                      >
+                        <span className="code-line-number" aria-hidden="true">
+                          {index + 1}
+                        </span>
+                        <span className="code-line-content">
+                          {line.length > 0 ? line : "\u00a0"}
+                        </span>
+                      </span>
+                    ))}
+                  </code>
+                </pre>
+              );
+            }
+
             return (
-              <pre
-                className={className ? `code-block ${className}` : "code-block"}
-                {...rest}
-              >
+              <pre className={preClassName} {...rest}>
                 {children}
               </pre>
             );
@@ -260,6 +311,18 @@ export function MarkdownRenderer({
           code(props) {
             const { className, children, node, ...rest } = props;
             const value = textFromReactNode(children);
+            const blockLikeCode = isBlockCodeClassName(className) || value.includes("\n");
+
+            if (blockLikeCode) {
+              return (
+                <code
+                  className={joinClassNames("code-content", className)}
+                  {...rest}
+                >
+                  {children}
+                </code>
+              );
+            }
 
             return (
               <code
@@ -313,6 +376,13 @@ export function MarkdownRenderer({
           state={filePreviewState}
           renderMarkdown={(markdownText, context) => (
             <MarkdownRenderer text={markdownText} localFileContext={context} />
+          )}
+          renderCode={(codeText, displayPath, context) => (
+            <MarkdownRenderer
+              text={createCodePreviewMarkdown(codeText, displayPath)}
+              localFileContext={context}
+              codeBlockLineNumbers
+            />
           )}
           onClose={() => setFilePreviewState(null)}
         />

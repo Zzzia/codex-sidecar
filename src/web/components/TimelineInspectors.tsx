@@ -1,8 +1,22 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
-import { ArrowUp, X } from "lucide-react";
+import { ArrowUp, FileSearch, X } from "lucide-react";
 import type { PatchRunView, ExplorationStepView, ToolRunView } from "@web/lib/turns";
 import { DiffViewer } from "./DiffViewer";
+import { LocalFilePreviewModal } from "./LocalFilePreviewModal";
+import { MarkdownRenderer } from "./MarkdownRenderer";
+import { createCodePreviewMarkdown } from "./codePreviewMarkdown";
+import {
+  requestLocalFilePreview,
+  type LocalFileContext,
+  type LocalFilePreviewState,
+} from "./localFilePreview";
 import {
   formatTimestamp,
   shouldShowPatchBackTop,
@@ -20,16 +34,95 @@ function renderPageModal(content: ReactNode): ReactNode {
   return createPortal(content, document.body);
 }
 
+function PatchFilePreviewButton({
+  fileName,
+  filePath,
+  changeType,
+  localFileContext,
+}: {
+  fileName: string;
+  filePath?: string;
+  changeType: string;
+  localFileContext?: LocalFileContext | null;
+}) {
+  const [filePreviewState, setFilePreviewState] =
+    useState<LocalFilePreviewState | null>(null);
+  const previewHref = filePath || fileName;
+  const canPreviewFile =
+    Boolean(localFileContext) && previewHref.trim().length > 0 && changeType !== "delete";
+
+  if (!canPreviewFile) {
+    return null;
+  }
+
+  const openFilePreview = (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!localFileContext) {
+      return;
+    }
+
+    setFilePreviewState({ status: "loading", href: previewHref });
+    requestLocalFilePreview(localFileContext, previewHref)
+      .then((preview) => {
+        setFilePreviewState({ status: "ready", href: previewHref, preview });
+      })
+      .catch((error: unknown) => {
+        setFilePreviewState({
+          status: "error",
+          href: previewHref,
+          message: error instanceof Error ? error.message : "文件预览失败",
+        });
+      });
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        className="patch-preview-button"
+        title="预览完整文件"
+        aria-label={`预览完整文件：${fileName}`}
+        onClick={openFilePreview}
+      >
+        <FileSearch size={14} />
+      </button>
+      {filePreviewState && localFileContext ? (
+        <LocalFilePreviewModal
+          context={localFileContext}
+          state={filePreviewState}
+          renderMarkdown={(markdownText, context) => (
+            <MarkdownRenderer text={markdownText} localFileContext={context} />
+          )}
+          renderCode={(codeText, displayPath, context) => (
+            <MarkdownRenderer
+              text={createCodePreviewMarkdown(codeText, displayPath)}
+              localFileContext={context}
+              codeBlockLineNumbers
+            />
+          )}
+          onClose={() => setFilePreviewState(null)}
+        />
+      ) : null}
+    </>
+  );
+}
+
 export function PatchPreview({
   fileName,
+  filePath,
   unifiedDiff,
   changeType = "update",
   defaultExpanded = false,
+  localFileContext,
 }: {
   fileName: string;
+  filePath?: string;
   unifiedDiff: string;
   changeType?: string;
   defaultExpanded?: boolean;
+  localFileContext?: LocalFileContext | null;
 }) {
   const [open, setOpen] = useState(defaultExpanded);
 
@@ -41,7 +134,15 @@ export function PatchPreview({
         setOpen((event.currentTarget as HTMLDetailsElement).open);
       }}
     >
-      <summary>{fileName}</summary>
+      <summary className="tool-patch-summary">
+        <span className="tool-patch-summary-name">{fileName}</span>
+        <PatchFilePreviewButton
+          fileName={fileName}
+          filePath={filePath}
+          changeType={changeType}
+          localFileContext={localFileContext}
+        />
+      </summary>
       {open ? (
         <DiffViewer
           fileName={fileName}
@@ -55,14 +156,18 @@ export function PatchPreview({
 
 function InlinePatchFile({
   fileName,
+  filePath,
   unifiedDiff,
   changeType,
   ts,
+  localFileContext,
 }: {
   fileName: string;
+  filePath: string;
   unifiedDiff: string;
   changeType: string;
   ts: string;
+  localFileContext: LocalFileContext | null;
 }) {
   const [open, setOpen] = useState(true);
   const detailsRef = useRef<HTMLDetailsElement | null>(null);
@@ -120,6 +225,12 @@ function InlinePatchFile({
         <span className="inline-patch-name">{fileName}</span>
         <span className="inline-patch-type">{changeType}</span>
         <time>{formatTimestamp(ts)}</time>
+        <PatchFilePreviewButton
+          fileName={fileName}
+          filePath={filePath}
+          changeType={changeType}
+          localFileContext={localFileContext}
+        />
       </summary>
       {open ? (
         <div ref={bodyRef} className="inline-patch-body">
@@ -155,7 +266,13 @@ function InlinePatchFile({
   );
 }
 
-export function InlinePatchRun({ item }: { item: PatchRunView }) {
+export function InlinePatchRun({
+  item,
+  localFileContext,
+}: {
+  item: PatchRunView;
+  localFileContext: LocalFileContext | null;
+}) {
   return (
     <section className="turn-patch-block">
       <div className="turn-patch-list always-open">
@@ -163,9 +280,11 @@ export function InlinePatchRun({ item }: { item: PatchRunView }) {
           <InlinePatchFile
             key={`${item.id}:${change.path}`}
             fileName={change.displayPath}
+            filePath={change.path}
             unifiedDiff={change.unifiedDiff}
             changeType={change.changeType}
             ts={item.ts}
+            localFileContext={localFileContext}
           />
         ))}
       </div>
@@ -173,7 +292,13 @@ export function InlinePatchRun({ item }: { item: PatchRunView }) {
   );
 }
 
-function ToolRunDetails({ tool }: { tool: ToolRunView }) {
+function ToolRunDetails({
+  tool,
+  localFileContext,
+}: {
+  tool: ToolRunView;
+  localFileContext?: LocalFileContext | null;
+}) {
   const invocationText = tool.commandText || tool.invocationText;
   const invocationTitle = tool.commandText ? "命令" : "调用内容";
 
@@ -208,8 +333,10 @@ function ToolRunDetails({ tool }: { tool: ToolRunView }) {
               <PatchPreview
                 key={`${tool.id}:${change.path}`}
                 fileName={change.displayPath}
+                filePath={change.path}
                 unifiedDiff={change.unifiedDiff}
                 changeType={change.changeType}
+                localFileContext={localFileContext}
               />
             ))}
           </div>
@@ -221,9 +348,11 @@ function ToolRunDetails({ tool }: { tool: ToolRunView }) {
 
 export function ToolDetailsModal({
   tool,
+  localFileContext,
   onClose,
 }: {
   tool: ToolRunView;
+  localFileContext?: LocalFileContext | null;
   onClose: () => void;
 }) {
   return renderPageModal(
@@ -235,9 +364,9 @@ export function ToolDetailsModal({
         }}
       >
         <header className="tool-modal-header">
-          <div>
+          <div className="tool-modal-title-wrap">
             <div className="tool-modal-eyebrow">{toolLabel(tool.name)}</div>
-            <h3>{tool.preview}</h3>
+            <h3 title={tool.preview}>{tool.preview}</h3>
           </div>
           <button className="icon-button" onClick={onClose} title="关闭">
             <X size={16} />
@@ -250,7 +379,7 @@ export function ToolDetailsModal({
           {tool.patchSummary ? <span>{tool.patchSummary}</span> : null}
         </div>
 
-        <ToolRunDetails tool={tool} />
+        <ToolRunDetails tool={tool} localFileContext={localFileContext} />
       </div>
     </div>,
   );
@@ -258,11 +387,15 @@ export function ToolDetailsModal({
 
 export function ExplorationDetailsModal({
   step,
+  localFileContext,
   onClose,
 }: {
   step: ExplorationStepView;
+  localFileContext?: LocalFileContext | null;
   onClose: () => void;
 }) {
+  const stepSummary = summarizeExplorationStep(step);
+
   return renderPageModal(
     <div className="tool-modal-backdrop" onClick={onClose}>
       <div
@@ -272,9 +405,9 @@ export function ExplorationDetailsModal({
         }}
       >
         <header className="tool-modal-header">
-          <div>
+          <div className="tool-modal-title-wrap">
             <div className="tool-modal-eyebrow">探索</div>
-            <h3>{summarizeExplorationStep(step)}</h3>
+            <h3 title={stepSummary}>{stepSummary}</h3>
           </div>
           <button className="icon-button" onClick={onClose} title="关闭">
             <X size={16} />
@@ -289,7 +422,7 @@ export function ExplorationDetailsModal({
         {step.tools.map((tool) => (
           <div key={tool.id} className="tool-modal-call-block">
             <div className="tool-modal-call-title">{tool.preview}</div>
-            <ToolRunDetails tool={tool} />
+            <ToolRunDetails tool={tool} localFileContext={localFileContext} />
           </div>
         ))}
       </div>

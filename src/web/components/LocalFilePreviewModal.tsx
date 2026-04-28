@@ -38,11 +38,13 @@ export function LocalFilePreviewModal({
   context,
   state,
   renderMarkdown,
+  renderCode,
   onClose,
 }: {
   context: LocalFileContext;
   state: LocalFilePreviewState;
   renderMarkdown: (text: string, context: LocalFileContext) => ReactNode;
+  renderCode?: (text: string, displayPath: string, context: LocalFileContext) => ReactNode;
   onClose: () => void;
 }) {
   const title =
@@ -94,9 +96,13 @@ export function LocalFilePreviewModal({
             : null}
 
           {state.status === "ready" && state.preview.kind === "code" ? (
-            <pre className="code-block local-file-code">
-              <code>{state.preview.content ?? ""}</code>
-            </pre>
+            renderCode ? (
+              renderCode(state.preview.content ?? "", state.preview.displayPath, context)
+            ) : (
+              <pre className="code-block local-file-code">
+                <code>{state.preview.content ?? ""}</code>
+              </pre>
+            )
           ) : null}
 
           {state.status === "ready" && state.preview.kind === "image" ? (

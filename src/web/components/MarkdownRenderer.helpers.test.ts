@@ -4,6 +4,7 @@ import React from "react";
 import {
   codeChildFromPre,
   codeLanguageFromClassName,
+  splitCodeLines,
   textFromReactNode,
 } from "./MarkdownRenderer.helpers.js";
 
@@ -28,4 +29,17 @@ test("codeChildFromPre accepts react-markdown mapped code elements", () => {
 test("codeLanguageFromClassName normalizes fenced code language", () => {
   assert.equal(codeLanguageFromClassName("inline-code language-Mermaid"), "mermaid");
   assert.equal(codeLanguageFromClassName("inline-code"), null);
+});
+
+test("splitCodeLines preserves highlighted spans across lines", () => {
+  const children = [
+    React.createElement("span", { className: "hljs-keyword", key: "a" }, "export\nconst"),
+    " value = 1;\n",
+  ];
+
+  const lines = splitCodeLines(children);
+
+  assert.equal(lines.length, 2);
+  assert.equal(textFromReactNode(lines[0]), "export");
+  assert.equal(textFromReactNode(lines[1]), "const value = 1;");
 });
