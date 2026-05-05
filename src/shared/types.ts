@@ -1,4 +1,5 @@
 export type ThreadStatus = "idle" | "running" | "completed" | "error";
+export type ThreadStreamPriority = "normal" | "active";
 
 export interface ThreadSummary {
   id: string;

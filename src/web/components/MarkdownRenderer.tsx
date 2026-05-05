@@ -4,6 +4,8 @@ import {
   useState,
   type MouseEvent,
 } from "react";
+import { createPortal } from "react-dom";
+import { Maximize2, X } from "lucide-react";
 import Markdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import rehypeRaw from "rehype-raw";
@@ -94,6 +96,7 @@ function renderMermaidChart(chart: string, id: string): Promise<string> {
 function MermaidBlock({ chart }: { chart: string }) {
   const [svg, setSvg] = useState<string>(() => mermaidSvgCache.get(chart) ?? "");
   const [error, setError] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const id = useId().replace(/:/g, "-");
 
   useEffect(() => {
@@ -144,11 +147,67 @@ function MermaidBlock({ chart }: { chart: string }) {
   }
 
   return (
-    <div
-      className="mermaid-block"
-      dangerouslySetInnerHTML={{ __html: svg }}
-    />
+    <>
+      <div className="mermaid-block">
+        <button
+          type="button"
+          className="mermaid-fullscreen-button"
+          title="全屏预览 Mermaid"
+          aria-label="全屏预览 Mermaid"
+          onClick={() => setPreviewOpen(true)}
+        >
+          <Maximize2 size={14} />
+        </button>
+        <div
+          className="mermaid-svg-wrap"
+          dangerouslySetInnerHTML={{ __html: svg }}
+        />
+      </div>
+      {previewOpen ? (
+        <MermaidPreviewModal svg={svg} onClose={() => setPreviewOpen(false)} />
+      ) : null}
+    </>
   );
+}
+
+function MermaidPreviewModal({
+  svg,
+  onClose,
+}: {
+  svg: string;
+  onClose: () => void;
+}) {
+  const content = (
+    <div className="mermaid-preview-backdrop" onClick={onClose}>
+      <div
+        className="mermaid-preview-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Mermaid 全屏预览"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <button
+          type="button"
+          className="mermaid-preview-close"
+          title="关闭"
+          aria-label="关闭 Mermaid 预览"
+          onClick={onClose}
+        >
+          <X size={16} />
+        </button>
+        <div
+          className="mermaid-preview-canvas"
+          dangerouslySetInnerHTML={{ __html: svg }}
+        />
+      </div>
+    </div>
+  );
+
+  if (typeof document === "undefined") {
+    return content;
+  }
+
+  return createPortal(content, document.body);
 }
 
 export function extractPlanText(text: string): string | null {

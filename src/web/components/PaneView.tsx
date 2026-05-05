@@ -52,7 +52,10 @@ const PaneContent = memo(function PaneContent({
 });
 
 export function PaneView(props: PaneViewProps) {
-  const { thread, events, loading, error } = useThreadFeed(props.threadId);
+  const { thread, events, loading, error } = useThreadFeed(
+    props.threadId,
+    props.active ? "active" : "normal",
+  );
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const status = thread?.status ?? "idle";

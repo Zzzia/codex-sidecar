@@ -98,14 +98,9 @@ function stripAnchorAndQuery(rawHref: string): string {
   return queryIndex >= 0 ? withoutAnchor.slice(0, queryIndex) : withoutAnchor;
 }
 
-function hrefToPath(cwd: string, href: string): string {
-  const trimmedHref = stripAnchorAndQuery(href.trim());
-  if (!trimmedHref) {
-    throw new LocalFilePreviewError("Missing file path", 400);
-  }
-
+function hrefCandidateToPath(cwd: string, href: string): string {
   try {
-    const parsedUrl = new URL(trimmedHref);
+    const parsedUrl = new URL(href);
     if (parsedUrl.protocol !== "file:") {
       throw new LocalFilePreviewError("Only local file links can be previewed", 400);
     }
@@ -116,9 +111,40 @@ function hrefToPath(cwd: string, href: string): string {
     }
   }
 
-  return path.isAbsolute(trimmedHref)
-    ? path.normalize(trimmedHref)
-    : path.resolve(cwd, trimmedHref);
+  return path.isAbsolute(href) ? path.normalize(href) : path.resolve(cwd, href);
+}
+
+function decodePercentEncodedHref(href: string): string | null {
+  if (!/%[0-9a-f]{2}/i.test(href)) {
+    return null;
+  }
+
+  try {
+    const decodedHref = decodeURIComponent(href);
+    return decodedHref === href ? null : decodedHref;
+  } catch {
+    return null;
+  }
+}
+
+function hasNonFileScheme(href: string): boolean {
+  const schemeMatch = /^[a-z][a-z\d+.-]*:/i.exec(href);
+  return Boolean(schemeMatch && schemeMatch[0].toLowerCase() !== "file:");
+}
+
+function hrefToPathCandidates(cwd: string, href: string): string[] {
+  const trimmedHref = stripAnchorAndQuery(href.trim());
+  if (!trimmedHref) {
+    throw new LocalFilePreviewError("Missing file path", 400);
+  }
+
+  const candidates = [hrefCandidateToPath(cwd, trimmedHref)];
+  const decodedHref = decodePercentEncodedHref(trimmedHref);
+  if (decodedHref && !hasNonFileScheme(decodedHref)) {
+    candidates.push(hrefCandidateToPath(cwd, decodedHref));
+  }
+
+  return Array.from(new Set(candidates));
 }
 
 function mimeTypeForPath(filePath: string): string | null {
@@ -134,14 +160,6 @@ function mimeTypeForPath(filePath: string): string | null {
 
 function stripLineSuffix(filePath: string): string {
   return filePath.replace(/:\d+(?::\d+)?$/, "");
-}
-
-function isPathInside(parent: string, target: string): boolean {
-  const relativePath = path.relative(parent, target);
-  return (
-    relativePath === "" ||
-    (!relativePath.startsWith("..") && !path.isAbsolute(relativePath))
-  );
 }
 
 function previewKindForPath(filePath: string): LocalFilePreviewKind {
@@ -168,36 +186,48 @@ function maxBytesForKind(kind: LocalFilePreviewKind): number {
     : MAX_TEXT_PREVIEW_BYTES;
 }
 
+function displayPathForPreview(cwd: string, targetPath: string): string {
+  const relativePath = path.relative(cwd, targetPath);
+  if (
+    relativePath &&
+    !relativePath.startsWith("..") &&
+    !path.isAbsolute(relativePath)
+  ) {
+    return relativePath;
+  }
+  return targetPath;
+}
+
 export async function previewLocalFile(
   cwd: string,
   href: string,
 ): Promise<LocalFilePreview> {
   const normalizedCwd = path.resolve(cwd);
-  const targetPath = stripLineSuffix(hrefToPath(normalizedCwd, href));
+  let targetPath: string | null = null;
+  let realTargetPath: string | null = null;
 
-  if (!isPathInside(normalizedCwd, targetPath)) {
-    throw new LocalFilePreviewError("File is outside the current workspace", 403);
+  for (const candidatePath of hrefToPathCandidates(normalizedCwd, href)) {
+    const pathWithoutLineSuffix = stripLineSuffix(candidatePath);
+    const realCandidatePath = await realpath(pathWithoutLineSuffix).catch(() => null);
+    if (realCandidatePath) {
+      targetPath = pathWithoutLineSuffix;
+      realTargetPath = realCandidatePath;
+      break;
+    }
   }
 
-  const [realCwd, realTargetPath] = await Promise.all([
-    realpath(normalizedCwd).catch(() => null),
-    realpath(targetPath).catch(() => null),
-  ]);
-  if (!realCwd) {
-    throw new LocalFilePreviewError("Workspace not found", 404);
-  }
   if (!realTargetPath) {
     throw new LocalFilePreviewError("File not found", 404);
   }
-  if (!isPathInside(realCwd, realTargetPath)) {
-    throw new LocalFilePreviewError("File is outside the current workspace", 403);
+  if (!targetPath) {
+    throw new LocalFilePreviewError("Missing file path", 400);
   }
 
   const fileStat = await stat(realTargetPath);
   if (!fileStat.isFile()) {
     throw new LocalFilePreviewError("Only regular files can be previewed", 400);
   }
-  const displayPath = path.relative(normalizedCwd, targetPath) || path.basename(targetPath);
+  const displayPath = displayPathForPreview(normalizedCwd, targetPath);
   const kind = previewKindForPath(targetPath);
   if (kind === "unsupported") {
     return {

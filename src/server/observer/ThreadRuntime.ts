@@ -4,6 +4,7 @@ import { EventEmitter } from "node:events";
 import type {
   ThreadDelta,
   ThreadSnapshot,
+  ThreadStreamPriority,
   ThreadSummary,
   TimelineEvent,
 } from "../../shared/types.js";
@@ -18,13 +19,21 @@ interface ThreadRuntimeEvents {
   timeline: [TimelineEvent, number];
 }
 
+const DEFAULT_POLL_INTERVAL_MS = 1200;
+const ACTIVE_POLL_INTERVAL_MS = 400;
+
 export class ThreadRuntime {
   private readonly row: ThreadRow;
   private readonly summary: ThreadSummary;
   private readonly events: TimelineEvent[] = [];
   private readonly emitter = new EventEmitter();
   private readonly callNames = new Map<string, string>();
+  private readonly listenerPriorities = new Map<
+    (event: TimelineEvent, cursor: number) => void,
+    ThreadStreamPriority
+  >();
   private pollTimer: NodeJS.Timeout | null = null;
+  private pollIntervalMs: number | null = null;
   private offset = 0;
   private loaded = false;
   private loading: Promise<void> | null = null;
@@ -92,15 +101,18 @@ export class ThreadRuntime {
     return this.events.slice(Math.max(0, cursor));
   }
 
-  subscribe(listener: (event: TimelineEvent, cursor: number) => void): () => void {
+  subscribe(
+    listener: (event: TimelineEvent, cursor: number) => void,
+    priority: ThreadStreamPriority = "normal",
+  ): () => void {
+    this.listenerPriorities.set(listener, priority);
     this.emitter.on("timeline", listener);
-    this.ensurePolling();
+    this.updatePolling();
 
     return () => {
       this.emitter.off("timeline", listener);
-      if (this.emitter.listenerCount("timeline") === 0) {
-        this.stopPolling();
-      }
+      this.listenerPriorities.delete(listener);
+      this.updatePolling();
     };
   }
 
@@ -110,14 +122,32 @@ export class ThreadRuntime {
     this.emitter.emit("timeline", event, this.events.length);
   }
 
-  private ensurePolling(): void {
-    if (this.pollTimer) {
+  private desiredPollInterval(): number | null {
+    if (this.listenerPriorities.size === 0) {
+      return null;
+    }
+    return [...this.listenerPriorities.values()].includes("active")
+      ? ACTIVE_POLL_INTERVAL_MS
+      : DEFAULT_POLL_INTERVAL_MS;
+  }
+
+  private updatePolling(): void {
+    const nextInterval = this.desiredPollInterval();
+    if (nextInterval == null) {
+      this.stopPolling();
       return;
     }
 
+    if (this.pollTimer && this.pollIntervalMs === nextInterval) {
+      return;
+    }
+
+    this.stopPolling();
+    this.pollIntervalMs = nextInterval;
     this.pollTimer = setInterval(() => {
       void this.refresh();
-    }, 1200);
+    }, nextInterval);
+    void this.refresh();
   }
 
   private stopPolling(): void {
@@ -126,6 +156,7 @@ export class ThreadRuntime {
     }
     clearInterval(this.pollTimer);
     this.pollTimer = null;
+    this.pollIntervalMs = null;
   }
 
   async refresh(): Promise<void> {

@@ -3,6 +3,7 @@ import type {
   StreamEnvelope,
   ThreadDelta,
   ThreadSnapshot,
+  ThreadStreamPriority,
   ThreadStatus,
   ThreadSummary,
   TimelineEvent,
@@ -17,6 +18,7 @@ interface ThreadFeedState {
 }
 
 const DELTA_POLL_INTERVAL_MS = 5000;
+const DEFAULT_STREAM_PRIORITY: ThreadStreamPriority = "normal";
 
 function statusAfterEvent(
   currentStatus: ThreadStatus,
@@ -86,8 +88,12 @@ function mergeDelta(
   };
 }
 
-export function useThreadFeed(threadId: string): ThreadFeedState {
+export function useThreadFeed(
+  threadId: string,
+  streamPriority: ThreadStreamPriority = DEFAULT_STREAM_PRIORITY,
+): ThreadFeedState {
   const cursorRef = useRef(0);
+  const loadedThreadIdRef = useRef<string | null>(null);
   const [state, setState] = useState<ThreadFeedState>({
     thread: null,
     events: [],
@@ -141,32 +147,46 @@ export function useThreadFeed(threadId: string): ThreadFeedState {
 
     const connect = async () => {
       try {
-        setState((current) => ({
-          ...current,
-          loading: true,
-          error: null,
-        }));
+        if (loadedThreadIdRef.current !== threadId) {
+          cursorRef.current = 0;
+          setState((current) => ({
+            ...current,
+            loading: true,
+            error: null,
+          }));
 
-        const response = await fetch(`/api/threads/${threadId}/snapshot`);
-        if (!response.ok) {
-          throw new Error(`会话快照加载失败: ${response.status}`);
-        }
-        const snapshot = (await response.json()) as ThreadSnapshot;
-        if (disposed) {
-          return;
-        }
-        cursorRef.current = snapshot.nextCursor;
+          const response = await fetch(`/api/threads/${threadId}/snapshot`);
+          if (!response.ok) {
+            throw new Error(`会话快照加载失败: ${response.status}`);
+          }
+          const snapshot = (await response.json()) as ThreadSnapshot;
+          if (disposed) {
+            return;
+          }
+          loadedThreadIdRef.current = threadId;
+          cursorRef.current = snapshot.nextCursor;
 
-        setState({
-          thread: snapshot.thread,
-          events: snapshot.events,
-          cursor: snapshot.nextCursor,
-          loading: false,
-          error: null,
+          setState({
+            thread: snapshot.thread,
+            events: snapshot.events,
+            cursor: snapshot.nextCursor,
+            loading: false,
+            error: null,
+          });
+        } else {
+          setState((current) => ({
+            ...current,
+            error: null,
+          }));
+        }
+
+        const streamParams = new URLSearchParams({
+          after: String(cursorRef.current),
+          priority: streamPriority,
         });
 
         source = new EventSource(
-          `/api/threads/${threadId}/stream?after=${snapshot.nextCursor}`,
+          `/api/threads/${threadId}/stream?${streamParams.toString()}`,
         );
 
         source.addEventListener("timeline", (event) => {
@@ -233,7 +253,7 @@ export function useThreadFeed(threadId: string): ThreadFeedState {
       }
       source?.close();
     };
-  }, [threadId]);
+  }, [streamPriority, threadId]);
 
   return state;
 }

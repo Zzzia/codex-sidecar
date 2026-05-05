@@ -86,3 +86,37 @@ test("getDelta returns appended events and authoritative summary", async (t) => 
   assert.equal(delta.events[0]?.kind, "status");
   assert.equal(delta.nextCursor, 2);
 });
+
+test("subscribe raises polling frequency for active streams", async (t) => {
+  const workspace = await mkdtemp(path.join(os.tmpdir(), "codex-sidecar-runtime-"));
+  t.after(() => rm(workspace, { recursive: true, force: true }));
+
+  const rolloutPath = path.join(workspace, "rollout.jsonl");
+  await writeFile(rolloutPath, "");
+
+  const row: ThreadRow = {
+    id: "thread-3",
+    rollout_path: rolloutPath,
+    created_at_ms: 1,
+    updated_at_ms: 2,
+    source: "cli",
+    cwd: workspace,
+    title: "demo",
+    cli_version: "0.123.0",
+    first_user_message: "hello",
+  };
+  const runtime = new ThreadRuntime(row);
+  const runtimeTimers = runtime as unknown as { pollIntervalMs: number | null };
+
+  const unsubscribeNormal = runtime.subscribe(() => {}, "normal");
+  assert.equal(runtimeTimers.pollIntervalMs, 1200);
+
+  const unsubscribeActive = runtime.subscribe(() => {}, "active");
+  assert.equal(runtimeTimers.pollIntervalMs, 400);
+
+  unsubscribeActive();
+  assert.equal(runtimeTimers.pollIntervalMs, 1200);
+
+  unsubscribeNormal();
+  assert.equal(runtimeTimers.pollIntervalMs, null);
+});

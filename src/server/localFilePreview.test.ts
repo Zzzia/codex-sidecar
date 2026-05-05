@@ -57,6 +57,43 @@ test("previewLocalFile supports file urls inside cwd", async (t) => {
   assert.equal(preview.displayPath, "README.md");
 });
 
+test("previewLocalFile decodes percent-encoded local paths", async (t) => {
+  const workspace = await createWorkspace();
+  t.after(() => rm(workspace, { recursive: true, force: true }));
+
+  const documentDirectory = "斗破苍穹";
+  const documentPath = path.join(documentDirectory, "timeline.md");
+  await mkdir(path.join(workspace, documentDirectory));
+  await writeFile(path.join(workspace, documentPath), "# 时间线\n");
+
+  const absolutePreview = await previewLocalFile(
+    workspace,
+    encodeURI(path.join(workspace, documentPath)),
+  );
+  assert.equal(absolutePreview.kind, "markdown");
+  assert.equal(absolutePreview.displayPath, documentPath);
+  assert.equal(absolutePreview.content, "# 时间线\n");
+
+  const relativePreview = await previewLocalFile(workspace, encodeURI(documentPath));
+  assert.equal(relativePreview.kind, "markdown");
+  assert.equal(relativePreview.displayPath, documentPath);
+  assert.equal(relativePreview.content, "# 时间线\n");
+});
+
+test("previewLocalFile keeps literal percent-encoded filenames when they exist", async (t) => {
+  const workspace = await createWorkspace();
+  t.after(() => rm(workspace, { recursive: true, force: true }));
+
+  const literalPercentName = "%E6%96%97.md";
+  await writeFile(path.join(workspace, literalPercentName), "literal percent\n");
+
+  const preview = await previewLocalFile(workspace, literalPercentName);
+
+  assert.equal(preview.kind, "markdown");
+  assert.equal(preview.displayPath, literalPercentName);
+  assert.equal(preview.content, "literal percent\n");
+});
+
 test("previewLocalFile embeds common image and pdf files", async (t) => {
   const workspace = await createWorkspace();
   t.after(() => rm(workspace, { recursive: true, force: true }));
@@ -77,18 +114,23 @@ test("previewLocalFile embeds common image and pdf files", async (t) => {
   assert.match(pdf.dataUrl ?? "", /^data:application\/pdf;base64,/);
 });
 
-test("previewLocalFile rejects paths outside cwd", async (t) => {
+test("previewLocalFile previews absolute paths outside cwd", async (t) => {
   const workspace = await createWorkspace();
+  const outside = await mkdtemp(path.join(os.tmpdir(), "codex-sidecar-outside-"));
   t.after(() => rm(workspace, { recursive: true, force: true }));
+  t.after(() => rm(outside, { recursive: true, force: true }));
 
-  await assert.rejects(
-    () => previewLocalFile(workspace, "../outside.ts"),
-    (error) =>
-      error instanceof LocalFilePreviewError && error.statusCode === 403,
-  );
+  const outsideFile = path.join(outside, "outside.ts");
+  await writeFile(outsideFile, "export const outside = true;\n");
+
+  const preview = await previewLocalFile(workspace, outsideFile);
+
+  assert.equal(preview.kind, "code");
+  assert.equal(preview.displayPath, outsideFile);
+  assert.match(preview.content ?? "", /outside/);
 });
 
-test("previewLocalFile rejects symlinks that resolve outside cwd", async (t) => {
+test("previewLocalFile previews symlinks that resolve outside cwd", async (t) => {
   const workspace = await createWorkspace();
   const outside = await mkdtemp(path.join(os.tmpdir(), "codex-sidecar-outside-"));
   t.after(() => rm(workspace, { recursive: true, force: true }));
@@ -97,11 +139,11 @@ test("previewLocalFile rejects symlinks that resolve outside cwd", async (t) => 
   await writeFile(path.join(outside, "secret.ts"), "export const secret = true;\n");
   await symlink(path.join(outside, "secret.ts"), path.join(workspace, "secret.ts"));
 
-  await assert.rejects(
-    () => previewLocalFile(workspace, "secret.ts"),
-    (error) =>
-      error instanceof LocalFilePreviewError && error.statusCode === 403,
-  );
+  const preview = await previewLocalFile(workspace, "secret.ts");
+
+  assert.equal(preview.kind, "code");
+  assert.equal(preview.displayPath, "secret.ts");
+  assert.match(preview.content ?? "", /secret/);
 });
 
 test("previewLocalFile returns unsupported result without reading unknown files", async (t) => {

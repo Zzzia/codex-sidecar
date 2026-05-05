@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { TimelineEvent } from "../shared/types.js";
+import type { ThreadStreamPriority, TimelineEvent } from "../shared/types.js";
 import {
   LocalFilePreviewError,
   previewLocalFile,
@@ -33,6 +33,10 @@ function getStaticContentType(filePath: string): string {
 function readThreadId(urlPath: string): string | null {
   const match = urlPath.match(/^\/api\/threads\/([^/]+)\/(snapshot|events|stream|file)$/);
   return match?.[1] ?? null;
+}
+
+function readStreamPriority(value: string | null): ThreadStreamPriority {
+  return value === "active" ? "active" : "normal";
 }
 
 const server = createServer(async (request, response) => {
@@ -139,6 +143,7 @@ const server = createServer(async (request, response) => {
 
       const rawAfter = Number(url.searchParams.get("after") ?? "0");
       const after = Number.isFinite(rawAfter) && rawAfter >= 0 ? rawAfter : 0;
+      const priority = readStreamPriority(url.searchParams.get("priority"));
 
       response.writeHead(200, {
         "Content-Type": "text/event-stream; charset=utf-8",
@@ -164,6 +169,7 @@ const server = createServer(async (request, response) => {
             event,
           });
         },
+        priority,
       );
 
       const heartbeat = setInterval(() => {

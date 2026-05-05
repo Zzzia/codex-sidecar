@@ -4,6 +4,7 @@ import type {
   ThreadDelta,
   ThreadPage,
   ThreadSnapshot,
+  ThreadStreamPriority,
   ThreadSummary,
   TimelineEvent,
 } from "../../shared/types.js";
@@ -145,9 +146,10 @@ export class CodexObserver {
   async subscribe(
     threadId: string,
     listener: (event: TimelineEvent, cursor: number) => void,
+    priority: ThreadStreamPriority = "normal",
   ): Promise<() => void> {
     const runtime = await this.getRuntime(threadId);
-    return runtime.subscribe(listener);
+    return runtime.subscribe(listener, priority);
   }
 
   private async getRuntime(threadId: string): Promise<ThreadRuntime> {
