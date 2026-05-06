@@ -379,6 +379,63 @@ test("normalizeRecord ignores token_count and agent_message duplicates", () => {
   assert.deepEqual(agentEvents, []);
 });
 
+test("normalizeRecord exposes context compaction checkpoints without payload text", () => {
+  const events = normalizeRecord(
+    {
+      timestamp: "2026-04-22T08:00:01.000Z",
+      type: "compacted",
+      payload: {
+        message: "hidden summary",
+        replacement_history: [
+          { type: "message", role: "user", content: [] },
+          { type: "context_compaction", encrypted_content: "encrypted" },
+        ],
+      },
+    },
+    {
+      row,
+      callNames: new Map(),
+      status: "running",
+    },
+    3,
+  );
+
+  assert.equal(events.length, 1);
+  assert.equal(events[0]?.kind, "compaction");
+  if (events[0]?.kind !== "compaction") {
+    assert.fail("expected compaction event");
+  }
+  assert.equal(events[0].state, "running");
+  assert.equal(events[0].replacementItemCount, 2);
+  assert.doesNotMatch(events[0].detail ?? "", /hidden summary|encrypted/);
+});
+
+test("normalizeRecord marks context_compacted as completion", () => {
+  const events = normalizeRecord(
+    {
+      timestamp: "2026-04-22T08:00:02.000Z",
+      type: "event_msg",
+      payload: {
+        type: "context_compacted",
+      },
+    },
+    {
+      row,
+      callNames: new Map(),
+      status: "running",
+    },
+    4,
+  );
+
+  assert.equal(events.length, 1);
+  assert.equal(events[0]?.kind, "compaction");
+  if (events[0]?.kind !== "compaction") {
+    assert.fail("expected compaction event");
+  }
+  assert.equal(events[0].state, "completed");
+  assert.equal(events[0].title, "上下文压缩完成");
+});
+
 test("normalizeRecord treats turn_aborted as a terminal non-active status", () => {
   const context = {
     row,
@@ -428,4 +485,5 @@ test("createThreadSummary truncates title and first user message for sidebar pay
   assert.ok(summary.title.length <= 100);
   assert.ok(summary.firstUserMessage.length <= 100);
   assert.ok(summary.title.endsWith("…"));
+  assert.equal(summary.contextWindowUsage, null);
 });

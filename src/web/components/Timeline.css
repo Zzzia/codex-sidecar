@@ -73,6 +73,7 @@
 .turn-proposed-plan,
 .turn-tools,
 .turn-patches,
+.turn-compactions,
 .turn-exploration {
   border-top: none;
   padding-top: 0;
@@ -313,6 +314,117 @@
 .turn-exploration:hover .turn-exploration-list,
 .turn-exploration:focus-within .turn-exploration-list {
   opacity: 1;
+}
+
+.turn-compaction-list {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.compaction-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 7px 9px;
+  border-left: 3px solid rgba(63, 128, 91, 0.32);
+  background: rgba(63, 128, 91, 0.055);
+}
+
+.compaction-row.is-running {
+  border-left-color: var(--running);
+  background: rgba(180, 132, 48, 0.08);
+}
+
+.compaction-icon {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+}
+
+.compaction-row.is-running .compaction-icon {
+  color: var(--running);
+}
+
+.compaction-main {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 2px;
+}
+
+.compaction-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.compaction-detail {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.compaction-meta {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 16rem;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.compaction-meta span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.compaction-row.is-running .compaction-meta {
+  color: var(--running);
+}
+
+.compaction-row.is-running .compaction-meta svg {
+  animation: compaction-spin 1s linear infinite;
+}
+
+@keyframes compaction-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .compaction-row.is-running .compaction-meta svg {
+    animation: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .compaction-row {
+    align-items: flex-start;
+  }
+
+  .compaction-meta {
+    max-width: 8rem;
+  }
 }
 
 .exploration-label {

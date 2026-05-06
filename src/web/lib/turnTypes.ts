@@ -1,4 +1,5 @@
 import type {
+  ContextCompactionState,
   PatchChange,
   ThreadStatus,
   ToolInvocation,
@@ -32,6 +33,16 @@ export interface PatchRunView {
   summary: string;
   success: boolean;
   changes: PatchChange[];
+}
+
+export interface CompactionRunView {
+  id: string;
+  ts: string;
+  completedAt?: string;
+  state: ContextCompactionState;
+  title: string;
+  detail: string;
+  replacementItemCount?: number;
 }
 
 export type ExplorationStepView =
@@ -83,6 +94,11 @@ export type TurnBlock =
       type: "patch_runs";
       id: string;
       items: PatchRunView[];
+    }
+  | {
+      type: "compaction_runs";
+      id: string;
+      items: CompactionRunView[];
     };
 
 export interface TurnCardView {

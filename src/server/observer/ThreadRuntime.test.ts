@@ -14,6 +14,33 @@ function eventMsg(type: string, timestamp: string) {
   });
 }
 
+function tokenCount(timestamp: string, currentTokens: number, contextWindow: number) {
+  return JSON.stringify({
+    timestamp,
+    type: "event_msg",
+    payload: {
+      type: "token_count",
+      info: {
+        total_token_usage: {
+          input_tokens: currentTokens,
+          cached_input_tokens: 0,
+          output_tokens: 0,
+          reasoning_output_tokens: 0,
+          total_tokens: currentTokens,
+        },
+        last_token_usage: {
+          input_tokens: currentTokens,
+          cached_input_tokens: 0,
+          output_tokens: 0,
+          reasoning_output_tokens: 0,
+          total_tokens: currentTokens,
+        },
+        model_context_window: contextWindow,
+      },
+    },
+  });
+}
+
 test("getSnapshot refreshes appended terminal events after initial load", async (t) => {
   const workspace = await mkdtemp(path.join(os.tmpdir(), "codex-sidecar-runtime-"));
   t.after(() => rm(workspace, { recursive: true, force: true }));
@@ -85,6 +112,43 @@ test("getDelta returns appended events and authoritative summary", async (t) => 
   assert.equal(delta.events.length, 1);
   assert.equal(delta.events[0]?.kind, "status");
   assert.equal(delta.nextCursor, 2);
+});
+
+test("getDelta refreshes context window usage without timeline noise", async (t) => {
+  const workspace = await mkdtemp(path.join(os.tmpdir(), "codex-sidecar-runtime-"));
+  t.after(() => rm(workspace, { recursive: true, force: true }));
+
+  const rolloutPath = path.join(workspace, "rollout.jsonl");
+  await writeFile(
+    rolloutPath,
+    `${eventMsg("task_started", "2026-04-23T08:00:00.000Z")}\n`,
+  );
+
+  const row: ThreadRow = {
+    id: "thread-context-usage",
+    rollout_path: rolloutPath,
+    created_at_ms: 1,
+    updated_at_ms: 2,
+    source: "cli",
+    cwd: workspace,
+    title: "demo",
+    cli_version: "0.123.0",
+    first_user_message: "hello",
+  };
+  const runtime = new ThreadRuntime(row);
+  const firstSnapshot = await runtime.getSnapshot();
+
+  await appendFile(
+    rolloutPath,
+    `${tokenCount("2026-04-23T08:00:01.000Z", 135_200, 258_400)}\n`,
+  );
+
+  const delta = await runtime.getDelta(firstSnapshot.nextCursor);
+
+  assert.equal(delta.events.length, 0);
+  assert.equal(delta.nextCursor, firstSnapshot.nextCursor);
+  assert.equal(delta.thread.contextWindowUsage?.usedPercent, 50);
+  assert.equal(delta.thread.contextWindowUsage?.remainingPercent, 50);
 });
 
 test("subscribe raises polling frequency for active streams", async (t) => {

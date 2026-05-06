@@ -347,6 +347,20 @@ function normalizePatchChanges(changes: unknown, cwd: string): PatchChange[] {
   );
 }
 
+function countReplacementHistoryItems(payload: Record<string, unknown>): number | undefined {
+  return Array.isArray(payload.replacement_history)
+    ? payload.replacement_history.length
+    : undefined;
+}
+
+function describeCompactionDetail(replacementItemCount: number | undefined): string {
+  if (typeof replacementItemCount !== "number") {
+    return "Codex 正在整理长会话上下文";
+  }
+
+  return `Codex 正在整理长会话上下文，压缩后保留 ${replacementItemCount} 条历史项`;
+}
+
 export function createThreadSummary(row: ThreadRow) {
   const title = summarizeThreadText(row.title || row.first_user_message || row.id);
   const firstUserMessage = summarizeThreadText(row.first_user_message || "");
@@ -364,6 +378,7 @@ export function createThreadSummary(row: ThreadRow) {
     firstUserMessage,
     status: "idle" as ThreadStatus,
     eventCount: 0,
+    contextWindowUsage: null,
   };
 }
 
@@ -425,6 +440,19 @@ export function normalizeRecord(
           status: "completed",
           title: "对话中断",
           detail: "当前回合已被用户中断",
+        },
+      ];
+    }
+
+    if (type === "context_compacted") {
+      return [
+        {
+          id: createEventId(type, ts, lineNumber),
+          ts,
+          kind: "compaction",
+          state: "completed",
+          title: "上下文压缩完成",
+          detail: "Codex 已完成长会话上下文压缩",
         },
       ];
     }
@@ -499,8 +527,40 @@ export function normalizeRecord(
     return [];
   }
 
+  if (outerType === "compacted") {
+    const replacementItemCount = countReplacementHistoryItems(payload);
+
+    return [
+      {
+        id: createEventId(outerType, ts, lineNumber),
+        ts,
+        kind: "compaction",
+        state: "running",
+        title: "正在压缩上下文",
+        detail: describeCompactionDetail(replacementItemCount),
+        replacementItemCount,
+      },
+    ];
+  }
+
   if (outerType === "response_item") {
     const type = typeof payload.type === "string" ? payload.type : "unknown";
+
+    if (type === "compaction" || type === "context_compaction") {
+      const hasEncryptedContent = typeof payload.encrypted_content === "string";
+      return [
+        {
+          id: createEventId(type, ts, lineNumber),
+          ts,
+          kind: "compaction",
+          state: hasEncryptedContent ? "completed" : "running",
+          title: hasEncryptedContent ? "上下文压缩完成" : "正在压缩上下文",
+          detail: hasEncryptedContent
+            ? "Codex 已生成压缩后的加密上下文"
+            : "Codex 正在生成压缩后的上下文",
+        },
+      ];
+    }
 
     if (type === "message") {
       const role = getMessageRole(payload.role);

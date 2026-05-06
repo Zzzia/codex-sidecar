@@ -8,7 +8,7 @@ import {
   PanelsTopLeft,
   X,
 } from "lucide-react";
-import type { ThreadStatus } from "@shared/types";
+import type { ContextWindowUsage, ThreadStatus } from "@shared/types";
 import { useThreadFeed } from "@web/hooks/useThreadFeed";
 import { formatThreadTitle } from "@web/lib/threadTitle";
 import { PaneProgress } from "./PaneProgress";
@@ -50,6 +50,45 @@ const PaneContent = memo(function PaneContent({
     </>
   );
 });
+
+function formatTokens(value: number): string {
+  if (value >= 1_000_000) {
+    return `${(value / 1_000_000).toFixed(1)}M`;
+  }
+  if (value >= 1_000) {
+    return `${(value / 1_000).toFixed(1)}k`;
+  }
+  return String(value);
+}
+
+function ContextUsageBadge({
+  usage,
+}: {
+  usage: ContextWindowUsage | null | undefined;
+}) {
+  if (!usage) {
+    return null;
+  }
+
+  const level =
+    usage.usedPercent >= 90
+      ? "high"
+      : usage.usedPercent >= 70
+        ? "medium"
+        : "normal";
+  const title = [
+    `Context ${usage.usedPercent}% used`,
+    `${usage.remainingPercent}% left`,
+    `${formatTokens(usage.currentTokens)} / ${formatTokens(usage.contextWindow)} tokens`,
+  ].join("\n");
+
+  return (
+    <div className={`pane-context-usage is-${level}`} title={title}>
+      <span>Context</span>
+      <strong>{usage.usedPercent}%</strong>
+    </div>
+  );
+}
 
 export function PaneView(props: PaneViewProps) {
   const { thread, events, loading, error } = useThreadFeed(
@@ -116,6 +155,7 @@ export function PaneView(props: PaneViewProps) {
           </span>
         </div>
         <div className="pane-actions">
+          <ContextUsageBadge usage={thread?.contextWindowUsage} />
           <div className="pane-menu-wrap" ref={menuRef}>
             <button
               className="icon-button"

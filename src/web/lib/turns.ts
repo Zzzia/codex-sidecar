@@ -10,6 +10,7 @@ import {
 } from "./commandSemantics";
 import { commandTextFromResult, toolPreview } from "./toolPresentation";
 import type {
+  CompactionRunView,
   ExplorationStepView,
   PatchRunView,
   ToolRunView,
@@ -17,6 +18,7 @@ import type {
   TurnCardView,
 } from "./turnTypes";
 export type {
+  CompactionRunView,
   ExplorationStepView,
   PatchRunView,
   ToolRunView,
@@ -96,6 +98,21 @@ function ensurePatchBlock(turn: MutableTurn): PatchRunView[] {
   const block: TurnBlock = {
     type: "patch_runs",
     id: `patches:${turn.blocks.length}`,
+    items: [],
+  };
+  turn.blocks.push(block);
+  return block.items;
+}
+
+function ensureCompactionBlock(turn: MutableTurn): CompactionRunView[] {
+  const last = turn.blocks[turn.blocks.length - 1];
+  if (last?.type === "compaction_runs") {
+    return last.items;
+  }
+
+  const block: TurnBlock = {
+    type: "compaction_runs",
+    id: `compactions:${turn.blocks.length}`,
     items: [],
   };
   turn.blocks.push(block);
@@ -359,6 +376,41 @@ function appendProposedPlanBlock(turn: MutableTurn, text: string): void {
   });
 }
 
+function appendCompactionRun(
+  turn: MutableTurn,
+  event: Extract<TimelineEvent, { kind: "compaction" }>,
+): void {
+  const items = ensureCompactionBlock(turn);
+  if (event.state === "completed") {
+    let pending: CompactionRunView | null = null;
+    for (let index = items.length - 1; index >= 0; index -= 1) {
+      const item = items[index];
+      if (item && item.state !== "completed") {
+        pending = item;
+        break;
+      }
+    }
+    if (pending) {
+      pending.state = event.state;
+      pending.title = event.title;
+      pending.detail = event.detail ?? pending.detail;
+      pending.completedAt = event.ts;
+      return;
+    }
+  }
+
+  items.push({
+    id: event.id,
+    ts: event.ts,
+    state: event.state,
+    title: event.title,
+    detail: event.detail ?? "",
+    ...(typeof event.replacementItemCount === "number"
+      ? { replacementItemCount: event.replacementItemCount }
+      : {}),
+  });
+}
+
 function finalizeTurn(turn: MutableTurn): TurnCardView | null {
   const hasContent = turn.userText.trim() || turn.blocks.length > 0;
   if (!hasContent) {
@@ -462,6 +514,11 @@ export function buildTurnCards(events: TimelineEvent[]): TurnCardView[] {
       } else {
         appendMarkdownBlock(current, event.text);
       }
+      continue;
+    }
+
+    if (event.kind === "compaction") {
+      appendCompactionRun(current, event);
       continue;
     }
 

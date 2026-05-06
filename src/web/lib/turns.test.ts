@@ -333,6 +333,56 @@ test("buildTurnCards renders assistant proposed plans but skips update_plan in t
   assert.equal(cards[0]?.blocks[1]?.type, "assistant_markdown");
 });
 
+test("buildTurnCards renders context compaction as a merged status block", () => {
+  const events: TimelineEvent[] = [
+    {
+      id: "u1",
+      ts: "2026-04-22T08:00:01.000Z",
+      kind: "message",
+      role: "user",
+      text: "继续",
+      isPlan: false,
+    },
+    {
+      id: "compact-start",
+      ts: "2026-04-22T08:00:02.000Z",
+      kind: "compaction",
+      state: "running",
+      title: "正在压缩上下文",
+      detail: "Codex 正在整理长会话上下文",
+      replacementItemCount: 10,
+    },
+    {
+      id: "compact-end",
+      ts: "2026-04-22T08:00:03.000Z",
+      kind: "compaction",
+      state: "completed",
+      title: "上下文压缩完成",
+      detail: "Codex 已完成长会话上下文压缩",
+    },
+    {
+      id: "m1",
+      ts: "2026-04-22T08:00:04.000Z",
+      kind: "message",
+      role: "assistant",
+      text: "继续处理。",
+      isPlan: false,
+    },
+  ];
+
+  const cards = buildTurnCards(events);
+  assert.equal(cards.length, 1);
+  assert.equal(cards[0]?.blocks.length, 2);
+  assert.equal(cards[0]?.blocks[0]?.type, "compaction_runs");
+  if (cards[0]?.blocks[0]?.type !== "compaction_runs") {
+    assert.fail("expected compaction block");
+  }
+  assert.equal(cards[0].blocks[0].items.length, 1);
+  assert.equal(cards[0].blocks[0].items[0]?.state, "completed");
+  assert.equal(cards[0].blocks[0].items[0]?.replacementItemCount, 10);
+  assert.equal(cards[0]?.blocks[1]?.type, "assistant_markdown");
+});
+
 test("buildTurnCards filters write_stdin tool events", () => {
   const events: TimelineEvent[] = [
     {

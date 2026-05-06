@@ -116,6 +116,37 @@
   flex: none;
 }
 
+.pane-context-usage {
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  border: 1px solid rgba(72, 54, 33, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 252, 0.78);
+  color: rgba(107, 98, 85, 0.82);
+  font-size: 0.72rem;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.pane-context-usage strong {
+  color: var(--text);
+  font-size: 0.74rem;
+  font-weight: 650;
+}
+
+.pane-context-usage.is-medium {
+  border-color: rgba(168, 111, 29, 0.22);
+  background: rgba(255, 248, 234, 0.82);
+}
+
+.pane-context-usage.is-high {
+  border-color: rgba(157, 82, 58, 0.28);
+  background: rgba(255, 241, 235, 0.86);
+}
+
 .pane-menu-wrap {
   position: relative;
 }

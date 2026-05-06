@@ -1,6 +1,14 @@
 export type ThreadStatus = "idle" | "running" | "completed" | "error";
 export type ThreadStreamPriority = "normal" | "active";
 
+export interface ContextWindowUsage {
+  usedPercent: number;
+  remainingPercent: number;
+  currentTokens: number;
+  contextWindow: number;
+  updatedAt: string;
+}
+
 export interface ThreadSummary {
   id: string;
   cwd: string;
@@ -14,6 +22,7 @@ export interface ThreadSummary {
   firstUserMessage: string;
   status: ThreadStatus;
   eventCount: number;
+  contextWindowUsage: ContextWindowUsage | null;
 }
 
 export interface ProjectSummary {
@@ -112,6 +121,8 @@ export interface PatchChange {
   unifiedDiff: string;
 }
 
+export type ContextCompactionState = "running" | "completed";
+
 export type TimelineEvent =
   | {
       id: string;
@@ -153,6 +164,15 @@ export type TimelineEvent =
       success: boolean;
       summary: string;
       changes: PatchChange[];
+    }
+  | {
+      id: string;
+      ts: string;
+      kind: "compaction";
+      state: ContextCompactionState;
+      title: string;
+      detail?: string;
+      replacementItemCount?: number;
     }
   | {
       id: string;

@@ -13,6 +13,7 @@ import {
   normalizeRecord,
   summarizeThreadText,
 } from "./normalize.js";
+import { updateContextWindowUsage } from "./contextWindowUsage.js";
 import type { ThreadRow, ThreadRuntimeState } from "./types.js";
 
 interface ThreadRuntimeEvents {
@@ -231,6 +232,11 @@ export class ThreadRuntime {
     } catch {
       return;
     }
+
+    this.summary.contextWindowUsage = updateContextWindowUsage(
+      raw,
+      this.summary.contextWindowUsage,
+    );
 
     const nextEvents = normalizeRecord(
       raw,

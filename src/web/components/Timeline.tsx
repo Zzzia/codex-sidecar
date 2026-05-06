@@ -18,6 +18,7 @@ import {
   InlinePatchRun,
   ToolDetailsModal,
 } from "./TimelineInspectors";
+import { CompactionRunList } from "./TimelineCompaction";
 import { ExplorationRunList, ToolRunList } from "./TimelineRuns";
 import type { LocalFileContext } from "./localFilePreview";
 import {
@@ -188,6 +189,14 @@ function TurnCard({
                   localFileContext={localFileContext}
                 />
               ))}
+            </section>
+          );
+        }
+
+        if (block.type === "compaction_runs") {
+          return (
+            <section key={block.id} className="turn-compactions">
+              <CompactionRunList items={block.items} />
             </section>
           );
         }
