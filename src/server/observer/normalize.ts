@@ -31,6 +31,15 @@ function displayPath(filePath: string, cwd: string): string {
 }
 
 const THREAD_SUMMARY_TEXT_LIMIT = 100;
+const MEMORY_CITATION_OPEN = "<oai-mem-citation>";
+const MEMORY_CITATION_CLOSE = "</oai-mem-citation>";
+const PROPOSED_PLAN_OPEN = "<proposed_plan>";
+const PROPOSED_PLAN_CLOSE = "</proposed_plan>";
+
+type AssistantTextSegment = {
+  kind: "message" | "plan";
+  text: string;
+};
 
 export function summarizeThreadText(
   value: string,
@@ -67,8 +76,68 @@ function extractTextContent(content: unknown): string {
     .join("");
 }
 
-function containsProposedPlan(text: string): boolean {
-  return /<proposed_plan>\s*[\s\S]*?<\/proposed_plan>/.test(text);
+function stripMemoryCitationBlocks(text: string): string {
+  let visibleText = "";
+  let cursor = 0;
+
+  while (cursor < text.length) {
+    const openIndex = text.indexOf(MEMORY_CITATION_OPEN, cursor);
+    if (openIndex === -1) {
+      visibleText += text.slice(cursor);
+      break;
+    }
+
+    visibleText += text.slice(cursor, openIndex);
+
+    const bodyStart = openIndex + MEMORY_CITATION_OPEN.length;
+    const closeIndex = text.indexOf(MEMORY_CITATION_CLOSE, bodyStart);
+    if (closeIndex === -1) {
+      break;
+    }
+
+    cursor = closeIndex + MEMORY_CITATION_CLOSE.length;
+  }
+
+  return visibleText;
+}
+
+function splitPreservingLineEndings(text: string): string[] {
+  return text.match(/[^\n]*(?:\n|$)/g)?.filter((line) => line.length > 0) ?? [];
+}
+
+function splitProposedPlanBlocks(text: string): AssistantTextSegment[] {
+  const segments: AssistantTextSegment[] = [];
+  let currentKind: AssistantTextSegment["kind"] = "message";
+  let currentText = "";
+
+  const pushCurrent = () => {
+    if (!currentText.trim()) {
+      currentText = "";
+      return;
+    }
+    segments.push({ kind: currentKind, text: currentText });
+    currentText = "";
+  };
+
+  for (const line of splitPreservingLineEndings(text)) {
+    const normalizedLine = line.replace(/\r?\n$/, "").trim();
+    if (currentKind === "message" && normalizedLine === PROPOSED_PLAN_OPEN) {
+      pushCurrent();
+      currentKind = "plan";
+      continue;
+    }
+
+    if (currentKind === "plan" && normalizedLine === PROPOSED_PLAN_CLOSE) {
+      pushCurrent();
+      currentKind = "message";
+      continue;
+    }
+
+    currentText += line;
+  }
+
+  pushCurrent();
+  return segments;
 }
 
 function parseJsonString(value: unknown): unknown {
@@ -434,27 +503,31 @@ export function normalizeRecord(
     const type = typeof payload.type === "string" ? payload.type : "unknown";
 
     if (type === "message") {
-      const text = extractTextContent(payload.content);
-      if (!text) {
-        return [];
-      }
-
       const role = getMessageRole(payload.role);
       if (role !== "assistant") {
         return [];
       }
 
-      return [
-        {
-          id: createEventId(type, ts, lineNumber),
+      const text = stripMemoryCitationBlocks(extractTextContent(payload.content));
+      const segments = splitProposedPlanBlocks(text);
+      if (segments.length === 0) {
+        return [];
+      }
+
+      return segments.map((segment, index) => ({
+        id: createEventId(
+          type,
           ts,
-          kind: "message",
-          role,
-          phase: typeof payload.phase === "string" ? payload.phase : undefined,
-          text,
-          isPlan: containsProposedPlan(text),
-        },
-      ];
+          lineNumber,
+          segments.length > 1 ? `${segment.kind}:${index}` : undefined,
+        ),
+        ts,
+        kind: "message",
+        role,
+        phase: typeof payload.phase === "string" ? payload.phase : undefined,
+        text: segment.text,
+        isPlan: segment.kind === "plan",
+      }));
     }
 
     if (type === "function_call" || type === "custom_tool_call") {

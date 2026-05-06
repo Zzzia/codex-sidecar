@@ -65,6 +65,11 @@ export type TurnBlock =
       text: string;
     }
   | {
+      type: "proposed_plan";
+      id: string;
+      text: string;
+    }
+  | {
       type: "exploration_runs";
       id: string;
       items: ExplorationStepView[];

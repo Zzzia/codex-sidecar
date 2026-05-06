@@ -140,7 +140,7 @@ flowchart LR
 ### 3. `update_plan` 不进入正文区
 
 - `update_plan` 进入底部进度区
-- assistant 的 `<proposed_plan>` 作为兜底来源
+- Plan mode 的 assistant `<proposed_plan>` 展示为计划内容，不进入底部进度区
 - 相关实现入口在 `src/web/lib/progress.ts`
 
 ### 4. `write_stdin` 默认不在时间线中展示

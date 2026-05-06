@@ -11,11 +11,10 @@ export interface ThreadProgressView {
   ts: string;
   explanation: string;
   items: ProgressStepView[];
-  source: "update_plan" | "assistant_plan";
+  source: "update_plan";
 }
 
 type ToolCallEvent = Extract<TimelineEvent, { kind: "tool_call" }>;
-type MessageEvent = Extract<TimelineEvent, { kind: "message" }>;
 
 function sliceCurrentTurnEvents(events: TimelineEvent[]): TimelineEvent[] {
   for (let index = events.length - 1; index >= 0; index -= 1) {
@@ -37,11 +36,6 @@ function tryParseJson(text: string): Record<string, unknown> | null {
   } catch {
     return null;
   }
-}
-
-function extractPlanText(text: string): string | null {
-  const match = text.match(/<proposed_plan>\s*([\s\S]*?)\s*<\/proposed_plan>/);
-  return match?.[1]?.trim() ?? null;
 }
 
 function normalizeStatus(value: unknown): ProgressStepStatus | null {
@@ -97,53 +91,6 @@ function parseUpdatePlanEvent(event: ToolCallEvent): ThreadProgressView | null {
   };
 }
 
-function parseAssistantPlanEvent(
-  event: MessageEvent,
-): ThreadProgressView | null {
-  if (event.role !== "assistant" || !event.isPlan) {
-    return null;
-  }
-
-  const text = extractPlanText(event.text) ?? event.text;
-  const lines = text
-    .split(/\r?\n/)
-    .map((line: string) => line.trim())
-    .filter(Boolean);
-
-  if (lines.length === 0) {
-    return null;
-  }
-
-  const items: ProgressStepView[] = [];
-  const explanationLines: string[] = [];
-
-  for (const line of lines) {
-    const listMatch = line.match(/^([-*+]|\d+\.)\s+(.+)$/);
-    if (listMatch) {
-      items.push({
-        step: listMatch[2]?.trim() ?? "",
-        status: "pending",
-      });
-      continue;
-    }
-
-    if (!line.startsWith("#")) {
-      explanationLines.push(line);
-    }
-  }
-
-  if (items.length === 0) {
-    return null;
-  }
-
-  return {
-    ts: event.ts,
-    explanation: explanationLines.join(" ").trim(),
-    items,
-    source: "assistant_plan",
-  };
-}
-
 function findLatestStatusEvent(
   events: TimelineEvent[],
 ): Extract<TimelineEvent, { kind: "status" }> | null {
@@ -190,7 +137,6 @@ export function extractThreadProgress(
   threadStatus: ThreadStatus = "idle",
 ): ThreadProgressView | null {
   const currentTurnEvents = sliceCurrentTurnEvents(events);
-  let assistantFallback: ThreadProgressView | null = null;
   let latestPlan: ThreadProgressView | null = null;
 
   for (const event of currentTurnEvents) {
@@ -201,13 +147,6 @@ export function extractThreadProgress(
       }
       continue;
     }
-
-    if (event.kind === "message" && event.role === "assistant" && event.isPlan) {
-      const parsed = parseAssistantPlanEvent(event);
-      if (parsed) {
-        assistantFallback = parsed;
-      }
-    }
   }
 
   const latestStatusEvent = findLatestStatusEvent(currentTurnEvents);
@@ -215,7 +154,7 @@ export function extractThreadProgress(
     threadStatus !== "idle"
       ? threadStatus
       : latestStatusEvent?.status ?? "idle";
-  const finalTs = latestStatusEvent?.ts ?? latestPlan?.ts ?? assistantFallback?.ts ?? "";
+  const finalTs = latestStatusEvent?.ts ?? latestPlan?.ts ?? "";
 
-  return finalizeProgressState(latestPlan ?? assistantFallback, finalStatus, finalTs);
+  return finalizeProgressState(latestPlan, finalStatus, finalTs);
 }

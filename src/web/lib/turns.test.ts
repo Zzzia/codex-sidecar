@@ -281,7 +281,7 @@ test("buildTurnCards keeps start title when task_started status is missing", () 
   assert.equal(cards[0]?.statusTitle, "对话开始");
 });
 
-test("buildTurnCards skips update_plan and assistant plan content in timeline body", () => {
+test("buildTurnCards renders assistant proposed plans but skips update_plan in timeline body", () => {
   const events: TimelineEvent[] = [
     {
       id: "u1",
@@ -296,7 +296,7 @@ test("buildTurnCards skips update_plan and assistant plan content in timeline bo
       ts: "2026-04-22T08:00:02.000Z",
       kind: "message",
       role: "assistant",
-      text: "<proposed_plan>\n- 第一步\n</proposed_plan>",
+      text: "- 第一步\n",
       isPlan: true,
     },
     {
@@ -324,8 +324,13 @@ test("buildTurnCards skips update_plan and assistant plan content in timeline bo
 
   const cards = buildTurnCards(events);
   assert.equal(cards.length, 1);
-  assert.equal(cards[0]?.blocks.length, 1);
-  assert.equal(cards[0]?.blocks[0]?.type, "assistant_markdown");
+  assert.equal(cards[0]?.blocks.length, 2);
+  assert.equal(cards[0]?.blocks[0]?.type, "proposed_plan");
+  if (cards[0]?.blocks[0]?.type !== "proposed_plan") {
+    assert.fail("expected proposed plan block");
+  }
+  assert.equal(cards[0].blocks[0].text, "- 第一步\n");
+  assert.equal(cards[0]?.blocks[1]?.type, "assistant_markdown");
 });
 
 test("buildTurnCards filters write_stdin tool events", () => {

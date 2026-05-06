@@ -46,6 +46,10 @@ test("normalizeRecord extracts assistant markdown message and plan flag", () => 
   assert.equal(events.length, 1);
   assert.equal(events[0]?.kind, "message");
   assert.equal(events[0]?.isPlan, true);
+  if (events[0]?.kind !== "message") {
+    assert.fail("expected message event");
+  }
+  assert.equal(events[0].text, "# title\n");
 });
 
 test("normalizeRecord does not mark plain proposed_plan mentions as plans", () => {
@@ -59,7 +63,9 @@ test("normalizeRecord does not mark plain proposed_plan mentions as plans", () =
         content: [
           {
             type: "output_text",
-            text: "这里会把 `<proposed_plan>` 当作普通文本说明，不是真正的计划块。",
+            text:
+              "这里会把 `<proposed_plan>` 和 `</proposed_plan>` 当作普通文本说明，" +
+              "不是真正的计划块。",
           },
         ],
       },
@@ -75,6 +81,138 @@ test("normalizeRecord does not mark plain proposed_plan mentions as plans", () =
   assert.equal(events.length, 1);
   assert.equal(events[0]?.kind, "message");
   assert.equal(events[0]?.isPlan, false);
+});
+
+test("normalizeRecord splits assistant proposed_plan blocks from visible text", () => {
+  const events = normalizeRecord(
+    {
+      timestamp: "2026-04-22T08:00:00.000Z",
+      type: "response_item",
+      payload: {
+        type: "message",
+        role: "assistant",
+        content: [
+          {
+            type: "output_text",
+            text: "正文前\n<proposed_plan>\n- 第一步\n</proposed_plan>\n正文后",
+          },
+        ],
+      },
+    },
+    {
+      row,
+      callNames: new Map(),
+      status: "idle",
+    },
+    1,
+  );
+
+  assert.equal(events.length, 3);
+  assert.deepEqual(
+    events.map((event) => event.kind === "message" && event.isPlan),
+    [false, true, false],
+  );
+  assert.deepEqual(
+    events.map((event) => (event.kind === "message" ? event.text : "")),
+    ["正文前\n", "- 第一步\n", "正文后"],
+  );
+});
+
+test("normalizeRecord strips hidden memory citation blocks from assistant messages", () => {
+  const events = normalizeRecord(
+    {
+      timestamp: "2026-04-22T08:00:00.000Z",
+      type: "response_item",
+      payload: {
+        type: "message",
+        role: "assistant",
+        content: [
+          {
+            type: "output_text",
+            text:
+              "前文 <oai-mem-citation><citation_entries>\n" +
+              "MEMORY.md:214-214|note=[confirmed current cwd netcheck context]\n" +
+              "</citation_entries>\n<rollout_ids>\n" +
+              "019dd75a-cc97-7bf1-bc3d-12e6a958e76f\n" +
+              "</rollout_ids></oai-mem-citation> 后文",
+          },
+        ],
+      },
+    },
+    {
+      row,
+      callNames: new Map(),
+      status: "idle",
+    },
+    1,
+  );
+
+  assert.equal(events.length, 1);
+  assert.equal(events[0]?.kind, "message");
+  if (events[0]?.kind !== "message") {
+    assert.fail("expected message event");
+  }
+  assert.equal(events[0].text, "前文  后文");
+  assert.equal(events[0].isPlan, false);
+});
+
+test("normalizeRecord drops citation-only assistant messages", () => {
+  const events = normalizeRecord(
+    {
+      timestamp: "2026-04-22T08:00:00.000Z",
+      type: "response_item",
+      payload: {
+        type: "message",
+        role: "assistant",
+        content: [
+          {
+            type: "output_text",
+            text: "<oai-mem-citation>MEMORY.md:1-1|note=[x]</oai-mem-citation>",
+          },
+        ],
+      },
+    },
+    {
+      row,
+      callNames: new Map(),
+      status: "idle",
+    },
+    1,
+  );
+
+  assert.deepEqual(events, []);
+});
+
+test("normalizeRecord strips unterminated memory citation blocks at end of message", () => {
+  const events = normalizeRecord(
+    {
+      timestamp: "2026-04-22T08:00:00.000Z",
+      type: "response_item",
+      payload: {
+        type: "message",
+        role: "assistant",
+        content: [
+          {
+            type: "output_text",
+            text: "可见内容<oai-mem-citation><citation_entries>\nMEMORY.md:1-1|note=[x]",
+          },
+        ],
+      },
+    },
+    {
+      row,
+      callNames: new Map(),
+      status: "idle",
+    },
+    1,
+  );
+
+  assert.equal(events.length, 1);
+  assert.equal(events[0]?.kind, "message");
+  if (events[0]?.kind !== "message") {
+    assert.fail("expected message event");
+  }
+  assert.equal(events[0].text, "可见内容");
 });
 
 test("normalizeRecord preserves parsed exec commands from exec_command_end", () => {

@@ -161,6 +161,15 @@ function TurnCard({
           );
         }
 
+        if (block.type === "proposed_plan") {
+          return (
+            <section key={block.id} className="turn-proposed-plan">
+              <div className="turn-proposed-plan-label">Proposed Plan</div>
+              <MarkdownRenderer text={block.text} localFileContext={localFileContext} />
+            </section>
+          );
+        }
+
         if (block.type === "exploration_runs") {
           return (
             <section key={block.id} className="turn-exploration">

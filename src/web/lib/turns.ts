@@ -345,6 +345,20 @@ function appendMarkdownBlock(turn: MutableTurn, text: string): void {
   });
 }
 
+function appendProposedPlanBlock(turn: MutableTurn, text: string): void {
+  const last = turn.blocks[turn.blocks.length - 1];
+  if (last?.type === "proposed_plan") {
+    last.text = `${last.text}\n\n${text}`.trim();
+    return;
+  }
+
+  turn.blocks.push({
+    type: "proposed_plan",
+    id: `proposed_plan:${turn.blocks.length}`,
+    text,
+  });
+}
+
 function finalizeTurn(turn: MutableTurn): TurnCardView | null {
   const hasContent = turn.userText.trim() || turn.blocks.length > 0;
   if (!hasContent) {
@@ -443,7 +457,9 @@ export function buildTurnCards(events: TimelineEvent[]): TurnCardView[] {
     current.updatedAt = event.ts;
 
     if (event.kind === "message" && event.role === "assistant") {
-      if (!event.isPlan) {
+      if (event.isPlan) {
+        appendProposedPlanBlock(current, event.text);
+      } else {
         appendMarkdownBlock(current, event.text);
       }
       continue;

@@ -42,7 +42,7 @@ test("extractThreadProgress prefers latest update_plan tool call", () => {
   );
 });
 
-test("extractThreadProgress falls back to assistant proposed plan when update_plan is absent", () => {
+test("extractThreadProgress ignores assistant proposed plans when update_plan is absent", () => {
   const events: TimelineEvent[] = [
     {
       id: "m1",
@@ -55,12 +55,7 @@ test("extractThreadProgress falls back to assistant proposed plan when update_pl
   ];
 
   const progress = extractThreadProgress(events);
-  assert.ok(progress);
-  assert.equal(progress?.source, "assistant_plan");
-  assert.deepEqual(
-    progress?.items.map((item) => item.step),
-    ["看日志", "改渲染"],
-  );
+  assert.equal(progress, null);
 });
 
 test("extractThreadProgress completes in-progress steps after thread completion", () => {

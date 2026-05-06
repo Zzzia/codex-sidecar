@@ -70,6 +70,7 @@
 
 .turn-question,
 .turn-answer,
+.turn-proposed-plan,
 .turn-tools,
 .turn-patches,
 .turn-exploration {
@@ -85,7 +86,8 @@
 }
 
 .turn-question .markdown-body,
-.turn-answer .markdown-body {
+.turn-answer .markdown-body,
+.turn-proposed-plan .markdown-body {
   font-size: 0.93rem;
   line-height: 1.72;
 }
@@ -101,6 +103,20 @@
   padding: 16px 18px;
   border: none;
   background: rgba(63, 128, 91, 0.05);
+}
+
+.turn-proposed-plan {
+  padding: 14px 16px;
+  border-left: 3px solid rgba(63, 128, 91, 0.34);
+  background: rgba(63, 128, 91, 0.055);
+}
+
+.turn-proposed-plan-label {
+  margin-bottom: 10px;
+  color: rgba(72, 54, 33, 0.66);
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0;
 }
 
 .turn-tool-list {
