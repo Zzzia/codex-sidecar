@@ -6,7 +6,7 @@ Codex Sidecar 是一个围绕 **本地 Codex CLI** 的伴随式 Web UI。你继�
 
 它不是重新包装一套 CLI，也不要求你换掉原来的工作流。它做的事情更克制：**保留原生 CLI 体验，只补上 Markdown 预览、多工程切换、工具调用聚合和代码修改可视化。**
 
-![Codex Sidecar parallel monitoring](./imgs/screenshot-20260423-155210.webp)
+![Codex Sidecar parallel monitoring](./imgs/screenshot-20260511-201616.webp)
 
 上图是多个 Codex CLI 会话并行工作时的监看场景：左侧按项目聚合最近会话，右侧可以同时打开多个会话面板，实时查看正文输出、工具调用、patch 和进度状态。
 
