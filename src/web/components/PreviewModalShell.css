@@ -1,0 +1,112 @@
+.preview-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(42, 32, 23, 0.26);
+  backdrop-filter: blur(7px);
+}
+
+.preview-modal {
+  width: min(1180px, calc(100vw - 36px));
+  height: min(920px, calc(100vh - 36px));
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(72, 54, 33, 0.14);
+  border-radius: 18px;
+  background: rgba(255, 251, 244, 0.98);
+  box-shadow: 0 28px 70px rgba(42, 32, 23, 0.24);
+}
+
+.preview-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid rgba(72, 54, 33, 0.1);
+}
+
+.preview-modal-title-wrap {
+  min-width: 0;
+  flex: 1;
+}
+
+.preview-modal-eyebrow {
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.preview-modal-title-row {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.preview-modal-title-row h2,
+.preview-modal-title-row h3 {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.96rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preview-modal-meta {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.preview-modal-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.preview-modal-body {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(92, 84, 72, 0.28) transparent;
+}
+
+.preview-modal-body::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.preview-modal-body::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(92, 84, 72, 0.28);
+}
+
+@media (max-width: 760px) {
+  .preview-modal-backdrop {
+    padding: 14px;
+  }
+
+  .preview-modal-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .preview-modal-actions {
+    flex-wrap: wrap;
+  }
+}

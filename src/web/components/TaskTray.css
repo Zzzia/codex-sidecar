@@ -268,48 +268,7 @@
   display: none;
 }
 
-.thread-preview-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 42;
-  display: grid;
-  align-items: end;
-  justify-items: center;
-  padding: clamp(14px, 3vh, 28px) clamp(16px, 3vw, 36px)
-    clamp(22px, 5vh, 52px);
-  background: rgba(42, 32, 23, 0.24);
-  backdrop-filter: blur(7px);
-}
-
-.thread-preview-modal {
-  width: min(1080px, calc(100vw - 48px));
-  height: min(680px, calc(100vh - 108px));
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  border: 1px solid rgba(45, 42, 36, 0.14);
-  border-radius: 14px;
-  background: #fffef9;
-  box-shadow: 0 28px 80px rgba(42, 32, 23, 0.28);
-}
-
-.thread-preview-header {
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
-  border-bottom: 1px solid rgba(45, 42, 36, 0.09);
-  background: rgba(255, 255, 252, 0.94);
-}
-
-.thread-preview-title-wrap {
-  flex: 1;
-  gap: 7px;
-}
-
-.thread-preview-project,
-.thread-preview-title-wrap h2 {
+.thread-preview-project {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -320,17 +279,6 @@
 .thread-preview-divider {
   color: var(--muted);
   font-size: 0.78rem;
-}
-
-.thread-preview-title-wrap h2 {
-  margin: 0;
-  font-size: 0.86rem;
-  font-weight: 560;
-}
-
-.thread-preview-actions {
-  flex: none;
-  gap: 6px;
 }
 
 .tray-action-button {
@@ -417,19 +365,5 @@
   .task-tray-mobile-panel {
     min-height: 0;
     display: block;
-  }
-
-  .thread-preview-header {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .thread-preview-modal {
-    width: calc(100vw - 28px);
-    height: min(620px, calc(100vh - 96px));
-  }
-
-  .thread-preview-actions {
-    flex-wrap: wrap;
   }
 }
