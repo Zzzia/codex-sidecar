@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { DiffModeEnum, DiffView } from "@git-diff-view/react";
 import { prepareDiffView } from "@web/lib/diffViewData";
+import { CopyableCodeBlock } from "./CopyableCodeBlock";
 
 export function DiffViewer({
   fileName,
@@ -29,7 +30,12 @@ export function DiffViewer({
           diffViewTheme="light"
         />
       ) : (
-        <pre className="code-block">{prepared.fallbackText}</pre>
+        <CopyableCodeBlock
+          className="code-block"
+          copyText={prepared.fallbackText}
+        >
+          {prepared.fallbackText}
+        </CopyableCodeBlock>
       )}
     </div>
   );

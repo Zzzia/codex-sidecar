@@ -4,6 +4,7 @@ import type {
   LocalFileContext,
   LocalFilePreviewState,
 } from "./localFilePreview";
+import { CopyableCodeBlock } from "./CopyableCodeBlock";
 
 function formatBytes(size: number): string {
   if (size < 1024) {
@@ -99,9 +100,12 @@ export function LocalFilePreviewModal({
             renderCode ? (
               renderCode(state.preview.content ?? "", state.preview.displayPath, context)
             ) : (
-              <pre className="code-block local-file-code">
+              <CopyableCodeBlock
+                className="code-block local-file-code"
+                copyText={state.preview.content ?? ""}
+              >
                 <code>{state.preview.content ?? ""}</code>
-              </pre>
+              </CopyableCodeBlock>
             )
           ) : null}
 

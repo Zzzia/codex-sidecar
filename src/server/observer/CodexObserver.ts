@@ -116,6 +116,21 @@ export class CodexObserver {
     };
   }
 
+  async listActiveThreads(limit = 200): Promise<ThreadSummary[]> {
+    const rows = await listRecentCliThreads(this.dbPath, limit);
+    const summaries = await Promise.all(
+      rows.map(async (row) => {
+        const runtime = await this.ensureRuntime(row);
+        await runtime.refresh();
+        return runtime.getSummary();
+      }),
+    );
+
+    return summaries
+      .filter((summary) => summary.status === "running")
+      .sort((left, right) => right.updatedAt - left.updatedAt);
+  }
+
   async getThreadSnapshot(threadId: string): Promise<ThreadSnapshot> {
     const runtime = await this.getRuntime(threadId);
     return runtime.getSnapshot();

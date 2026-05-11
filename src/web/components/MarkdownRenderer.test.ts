@@ -16,4 +16,17 @@ test("MarkdownRenderer can render highlighted code blocks with line numbers", ()
   assert.match(markup, /data-line="1"/);
   assert.match(markup, /data-line="2"/);
   assert.match(markup, /hljs-keyword/);
+  assert.match(markup, /class="[^"]*copyable-code-block/);
+  assert.match(markup, /aria-label="复制代码块"/);
+});
+
+test("MarkdownRenderer does not add copy controls to inline code", () => {
+  const markup = renderToStaticMarkup(
+    React.createElement(MarkdownRenderer, {
+      text: "Use `pnpm test` before pushing.",
+    }),
+  );
+
+  assert.doesNotMatch(markup, /copyable-code-block/);
+  assert.doesNotMatch(markup, /aria-label="复制代码块"/);
 });

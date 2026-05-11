@@ -8,6 +8,7 @@ import {
 import { createPortal } from "react-dom";
 import { ArrowUp, FileSearch, X } from "lucide-react";
 import type { PatchRunView, ExplorationStepView, ToolRunView } from "@web/lib/turns";
+import { CopyableCodeBlock } from "./CopyableCodeBlock";
 import { DiffViewer } from "./DiffViewer";
 import { LocalFilePreviewModal } from "./LocalFilePreviewModal";
 import { MarkdownRenderer } from "./MarkdownRenderer";
@@ -307,21 +308,33 @@ function ToolRunDetails({
       {invocationText ? (
         <section className="tool-modal-section">
           <h4>{invocationTitle}</h4>
-          <pre className="code-block">{invocationText}</pre>
+          <CopyableCodeBlock className="code-block" copyText={invocationText}>
+            {invocationText}
+          </CopyableCodeBlock>
         </section>
       ) : null}
 
       {tool.result?.outputText ? (
         <section className="tool-modal-section">
           <h4>工具输出</h4>
-          <pre className="code-block">{tool.result.outputText}</pre>
+          <CopyableCodeBlock
+            className="code-block"
+            copyText={tool.result.outputText}
+          >
+            {tool.result.outputText}
+          </CopyableCodeBlock>
         </section>
       ) : null}
 
       {tool.result?.stderrText ? (
         <section className="tool-modal-section">
           <h4>错误输出</h4>
-          <pre className="code-block">{tool.result.stderrText}</pre>
+          <CopyableCodeBlock
+            className="code-block"
+            copyText={tool.result.stderrText}
+          >
+            {tool.result.stderrText}
+          </CopyableCodeBlock>
         </section>
       ) : null}
 

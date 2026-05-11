@@ -147,6 +147,20 @@
   background: rgba(255, 241, 235, 0.86);
 }
 
+.pane-pin-badge {
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  border: 1px solid rgba(63, 128, 91, 0.2);
+  border-radius: 999px;
+  background: rgba(63, 128, 91, 0.08);
+  color: var(--accent);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
 .pane-menu-wrap {
   position: relative;
 }

@@ -17,6 +17,7 @@ import {
   splitCodeLines,
   textFromReactNode,
 } from "./MarkdownRenderer.helpers";
+import { CopyableCodeBlock } from "./CopyableCodeBlock";
 import { LocalFilePreviewModal } from "./LocalFilePreviewModal";
 import {
   isLocalFileHref,
@@ -135,7 +136,11 @@ function MermaidBlock({ chart }: { chart: string }) {
   }, [chart, id]);
 
   if (error) {
-    return <pre className="code-block">{chart}</pre>;
+    return (
+      <CopyableCodeBlock className="code-block" copyText={chart}>
+        {chart}
+      </CopyableCodeBlock>
+    );
   }
 
   if (!svg) {
@@ -324,6 +329,7 @@ export function MarkdownRenderer({
             const { children, node, className, ...rest } = props;
             const codeChild = codeChildFromPre(children);
             const language = codeLanguageFromClassName(codeChild?.props.className);
+            const codeText = textFromReactNode(codeChild?.props.children ?? children);
             const preClassName = joinClassNames(
               "code-block",
               className,
@@ -331,16 +337,16 @@ export function MarkdownRenderer({
             );
 
             if (language === "mermaid") {
-              return (
-                <MermaidBlock
-                  chart={textFromReactNode(codeChild?.props.children).trim()}
-                />
-              );
+              return <MermaidBlock chart={codeText.trim()} />;
             }
 
             if (codeBlockLineNumbers && codeChild) {
               return (
-                <pre className={preClassName} {...rest}>
+                <CopyableCodeBlock
+                  className={preClassName}
+                  copyText={codeText}
+                  {...rest}
+                >
                   <code className={codeChild.props.className}>
                     {splitCodeLines(codeChild.props.children).map((line, index) => (
                       <span
@@ -357,14 +363,18 @@ export function MarkdownRenderer({
                       </span>
                     ))}
                   </code>
-                </pre>
+                </CopyableCodeBlock>
               );
             }
 
             return (
-              <pre className={preClassName} {...rest}>
+              <CopyableCodeBlock
+                className={preClassName}
+                copyText={codeText}
+                {...rest}
+              >
                 {children}
-              </pre>
+              </CopyableCodeBlock>
             );
           },
           code(props) {

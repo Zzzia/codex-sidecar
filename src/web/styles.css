@@ -57,10 +57,15 @@ a {
 .app-shell {
   height: 100%;
   position: relative;
-  display: block;
+  display: flex;
+  flex-direction: column;
   padding-left: 28px;
   overflow: hidden;
   min-width: 0;
+}
+
+.app-shell.is-sidebar-hidden {
+  padding-left: 0;
 }
 
 .app-shell > * {
@@ -108,8 +113,8 @@ a {
 .workspace-root,
 .workspace-group,
 .workspace-root > div,
-.workspace-root [data-group],
-.workspace-root [data-panel] {
+.workspace-panel,
+.workspace-root [data-panel-id] {
   height: 100%;
   min-width: 0;
   min-height: 0;
@@ -117,6 +122,8 @@ a {
 
 .workspace-root {
   position: relative;
+  flex: 1 1 auto;
+  height: auto;
   padding: 12px;
   width: 100%;
   max-width: 100%;
@@ -163,28 +170,14 @@ a {
   max-width: 100%;
 }
 
-.workspace-separator[data-separator] {
-  position: relative;
-  background: transparent;
-  width: 10px;
+.workspace-split {
+  display: grid;
+  gap: 8px;
 }
 
-.workspace-separator[data-separator]::before {
-  content: "";
-  position: absolute;
-  inset: 22px 4.5px;
-  border-radius: 999px;
-  background: rgba(45, 42, 36, 0.028);
-}
-
-.orientation-vertical > .workspace-separator[data-separator] {
-  width: auto;
-  height: 10px;
-  background: transparent;
-}
-
-.orientation-vertical > .workspace-separator[data-separator]::before {
-  inset: 4.5px 22px;
+.workspace-panel {
+  overflow: hidden;
+  resize: none;
 }
 
 .timeline-shell {
@@ -663,7 +656,8 @@ a {
 }
 
 .workspace-empty {
-  height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
   display: grid;
   place-content: center;
   text-align: center;

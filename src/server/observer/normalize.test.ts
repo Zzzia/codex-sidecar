@@ -272,6 +272,41 @@ test("normalizeRecord preserves parsed exec commands from exec_command_end", () 
   ]);
 });
 
+test("normalizeRecord preserves plain exec command output from function_call_output", () => {
+  const events = normalizeRecord(
+    {
+      timestamp: "2026-05-08T06:20:22.655Z",
+      type: "response_item",
+      payload: {
+        type: "function_call_output",
+        call_id: "call-1",
+        output:
+          "Chunk ID: abc123\n" +
+          "Wall time: 0.0000 seconds\n" +
+          "Process exited with code 0\n" +
+          "Output:\n" +
+          "hello from shell\n",
+      },
+    },
+    {
+      row,
+      callNames: new Map([["call-1", "exec_command"]]),
+      status: "running",
+    },
+    1,
+  );
+
+  assert.equal(events.length, 1);
+  assert.equal(events[0]?.kind, "tool_result");
+  if (events[0]?.kind !== "tool_result") {
+    assert.fail("expected tool_result event");
+  }
+  assert.equal(events[0].name, "exec_command");
+  assert.equal(events[0].result.exitCode, 0);
+  assert.equal(events[0].result.success, true);
+  assert.match(events[0].result.outputText, /hello from shell/);
+});
+
 test("normalizeRecord extracts patch changes from patch_apply_end", () => {
   const events = normalizeRecord(
     {

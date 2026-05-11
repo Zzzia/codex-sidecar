@@ -5,7 +5,8 @@ import {
   Maximize2,
   Minimize2,
   MoreVertical,
-  PanelsTopLeft,
+  Pin,
+  PinOff,
   X,
 } from "lucide-react";
 import type { ContextWindowUsage, ThreadStatus } from "@shared/types";
@@ -23,12 +24,13 @@ export interface PaneViewProps {
   active: boolean;
   floating: boolean;
   floatingClosing: boolean;
+  pinned?: boolean;
   onSelect: () => void;
   onClose: () => void;
+  onTogglePin?: () => void;
   onToggleCollapse: () => void;
   onSwap: () => void;
   onToggleOrientation: () => void;
-  onAutoDistribute: () => void;
   onToggleFloating: () => void;
 }
 
@@ -156,6 +158,12 @@ export function PaneView(props: PaneViewProps) {
         </div>
         <div className="pane-actions">
           <ContextUsageBadge usage={thread?.contextWindowUsage} />
+          {props.pinned ? (
+            <div className="pane-pin-badge" title="已固定在主面板">
+              <Pin size={12} />
+              <span>固定</span>
+            </div>
+          ) : null}
           <div className="pane-menu-wrap" ref={menuRef}>
             <button
               className="icon-button"
@@ -180,16 +188,6 @@ export function PaneView(props: PaneViewProps) {
                 >
                   <ChevronsUpDown size={14} />
                   <span>切换横竖分屏</span>
-                </button>
-                <button
-                  role="menuitem"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    runMenuAction(props.onAutoDistribute);
-                  }}
-                >
-                  <PanelsTopLeft size={14} />
-                  <span>自动分配大小</span>
                 </button>
                 <button
                   role="menuitem"
@@ -229,6 +227,18 @@ export function PaneView(props: PaneViewProps) {
                   )}
                   <span>{props.floating ? "退出浮窗" : "全屏浮窗"}</span>
                 </button>
+                {props.onTogglePin ? (
+                  <button
+                    role="menuitem"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      runMenuAction(props.onTogglePin!);
+                    }}
+                  >
+                    {props.pinned ? <PinOff size={14} /> : <Pin size={14} />}
+                    <span>{props.pinned ? "取消固定" : "固定到主面板"}</span>
+                  </button>
+                ) : null}
               </div>
             ) : null}
           </div>

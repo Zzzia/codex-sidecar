@@ -69,6 +69,12 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    if (request.method === "GET" && url.pathname === "/api/threads/active") {
+      const activeThreads = await observer.listActiveThreads();
+      json(response, 200, { items: activeThreads });
+      return;
+    }
+
     if (request.method === "GET" && url.pathname === "/api/thread-summaries") {
       const ids = url.searchParams
         .getAll("id")

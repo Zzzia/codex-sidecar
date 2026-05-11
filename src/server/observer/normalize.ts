@@ -152,10 +152,21 @@ function parseJsonString(value: unknown): unknown {
   }
 }
 
+function parseExitCodeFromOutput(outputText: string): number | null {
+  const match = outputText.match(/Process exited with code (-?\d+)/);
+  if (!match?.[1]) {
+    return null;
+  }
+
+  const exitCode = Number(match[1]);
+  return Number.isInteger(exitCode) ? exitCode : null;
+}
+
 function normalizeToolOutput(
   payload: Record<string, unknown>,
   fallbackTitle: string,
 ): ToolResultPayload {
+  const rawOutput = typeof payload.output === "string" ? payload.output : "";
   const parsed = parseJsonString(payload.output);
   const data =
     parsed && typeof parsed === "object"
@@ -168,7 +179,10 @@ function normalizeToolOutput(
   const outputText = typeof data.output === "string" ? data.output : "";
   const stderrText = typeof data.stderr === "string" ? data.stderr : "";
   const exitCode =
-    typeof metadata.exit_code === "number" ? metadata.exit_code : null;
+    typeof metadata.exit_code === "number"
+      ? metadata.exit_code
+      : parseExitCodeFromOutput(rawOutput);
+  const visibleOutput = outputText || rawOutput;
 
   return {
     toolType:
@@ -178,7 +192,7 @@ function normalizeToolOutput(
     title: fallbackTitle,
     success: exitCode === null ? null : exitCode === 0,
     exitCode,
-    outputText,
+    outputText: visibleOutput,
     stderrText,
     parsedCommands: [],
     raw: parsed,
@@ -622,7 +636,7 @@ export function normalizeRecord(
     if (type === "function_call_output" || type === "custom_tool_call_output") {
       const callId = typeof payload.call_id === "string" ? payload.call_id : "";
       const name = context.callNames.get(callId) ?? "tool";
-      if (name === "exec_command" || name === "apply_patch") {
+      if (name === "apply_patch") {
         return [];
       }
 

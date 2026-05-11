@@ -46,6 +46,8 @@
   - 工具详情弹窗 / patch 展示
 - `src/web/state/workspace.ts`
   - 多分屏工作区的数据结构与持久化
+- `docs/auto-workspace.md`
+  - 自动主面板、底部任务托盘和容量设置规则
 
 ## 当前真实数据流
 

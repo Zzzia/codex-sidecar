@@ -1,4 +1,4 @@
-import { type FocusEvent, type KeyboardEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Activity,
   Check,
@@ -28,23 +28,13 @@ function threadLabel(thread: ThreadSummary): string {
   return formatThreadTitle(thread.title, thread.displayName);
 }
 
-function runKeyboardAction(event: KeyboardEvent, action: () => void): void {
-  if (event.key !== "Enter" && event.key !== " ") {
-    return;
-  }
-
-  event.preventDefault();
-  event.stopPropagation();
-  action();
-}
-
 interface ProjectSidebarProps {
   projects: Array<ProjectSummary & { loadedThreads: ThreadSummary[]; nextCursor: string | null }>;
   loading: boolean;
   error: string | null;
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
-  onOpenThread: (threadId: string) => void;
+  onOpenThread: (thread: ThreadSummary) => void;
   onLoadMore: (cwd: string) => Promise<void>;
 }
 
@@ -143,14 +133,6 @@ export function ProjectSidebar(props: ProjectSidebarProps) {
     }
   };
 
-  const onSidebarBlur = (event: FocusEvent<HTMLElement>) => {
-    const nextTarget = event.relatedTarget;
-    if (nextTarget instanceof Node && event.currentTarget.contains(nextTarget)) {
-      return;
-    }
-    closeTransientSidebar();
-  };
-
   return (
     <aside
       className={`project-sidebar ${sidebarExpanded ? "is-open" : "is-closed"} ${
@@ -158,8 +140,6 @@ export function ProjectSidebar(props: ProjectSidebarProps) {
       }`}
       onMouseEnter={() => setHoverExpanded(true)}
       onMouseLeave={closeTransientSidebar}
-      onFocus={() => setHoverExpanded(true)}
-      onBlur={onSidebarBlur}
     >
       {sidebarExpanded ? (
         <div className="sidebar-header">
@@ -220,15 +200,10 @@ export function ProjectSidebar(props: ProjectSidebarProps) {
                   filteredProjects.map((project) => (
                     <div
                       key={project.cwd}
-                      role="button"
-                      tabIndex={0}
                       className={`project-card ${
                         project.cwd === effectiveSelectedCwd ? "is-selected" : ""
                       }`}
                       onClick={() => setSelectedCwd(project.cwd)}
-                      onKeyDown={(event) =>
-                        runKeyboardAction(event, () => setSelectedCwd(project.cwd))
-                      }
                       title={`${project.displayName}\n${project.cwd}`}
                     >
                       <div className="project-card-header">
@@ -244,16 +219,9 @@ export function ProjectSidebar(props: ProjectSidebarProps) {
                                 className={`sidebar-copy-button ${
                                   copiedKey === `project:${project.cwd}` ? "is-copied" : ""
                                 }`}
-                                role="button"
-                                tabIndex={0}
                                 onClick={(event) => {
                                   event.stopPropagation();
                                   void copyText(`project:${project.cwd}`, project.cwd);
-                                }}
-                                onKeyDown={(event) => {
-                                  runKeyboardAction(event, () => {
-                                    void copyText(`project:${project.cwd}`, project.cwd);
-                                  });
                                 }}
                                 title={
                                   copiedKey === `project:${project.cwd}`
@@ -313,15 +281,10 @@ export function ProjectSidebar(props: ProjectSidebarProps) {
                   selectedThreads.map((thread) => (
                     <div
                       key={thread.id}
-                      role="button"
-                      tabIndex={0}
                       className={`thread-row ${
                         thread.status === "running" ? "is-live" : ""
                       }`}
-                      onClick={() => props.onOpenThread(thread.id)}
-                      onKeyDown={(event) =>
-                        runKeyboardAction(event, () => props.onOpenThread(thread.id))
-                      }
+                      onClick={() => props.onOpenThread(thread)}
                       title={`${threadLabel(thread)}\n${thread.cwd}`}
                     >
                       <div className={`status-dot status-${thread.status}`} />
@@ -337,16 +300,9 @@ export function ProjectSidebar(props: ProjectSidebarProps) {
                             className={`sidebar-copy-button ${
                               copiedKey === `thread:${thread.id}` ? "is-copied" : ""
                             }`}
-                            role="button"
-                            tabIndex={0}
                             onClick={(event) => {
                               event.stopPropagation();
                               void copyText(`thread:${thread.id}`, threadLabel(thread));
-                            }}
-                            onKeyDown={(event) => {
-                              runKeyboardAction(event, () => {
-                                void copyText(`thread:${thread.id}`, threadLabel(thread));
-                              });
                             }}
                             title={
                               copiedKey === `thread:${thread.id}`

@@ -1,5 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from "react";
-import { Group, Panel, Separator } from "react-resizable-panels";
+import { useEffect, useRef, useState } from "react";
 import {
   autoDistributeWorkspace,
   closeLeafInWorkspace,
@@ -7,7 +6,6 @@ import {
   swapWithSibling,
   toggleLeafCollapse,
   toggleParentOrientation,
-  updateSplitSizes,
   type WorkspaceNode,
   type WorkspaceState,
 } from "@web/state/workspace";
@@ -16,9 +14,13 @@ import { PaneView } from "./PaneView";
 interface WorkspaceViewProps {
   state: WorkspaceState;
   onChange: (updater: (state: WorkspaceState) => WorkspaceState) => void;
+  pinnedThreadIds?: readonly string[];
+  onCloseThread?: (threadId: string) => void;
+  onToggleThreadPin?: (threadId: string) => void;
 }
 
 const FLOATING_FADE_MS = 140;
+const WINDOW_RESIZE_DISTRIBUTE_MS = 120;
 
 function hasLeaf(node: WorkspaceNode | null, leafId: string): boolean {
   if (!node) {
@@ -30,18 +32,27 @@ function hasLeaf(node: WorkspaceNode | null, leafId: string): boolean {
   return hasLeaf(node.children[0], leafId) || hasLeaf(node.children[1], leafId);
 }
 
+function splitLayoutStyle(node: Extract<WorkspaceNode, { type: "split" }>) {
+  const tracks = [
+    `minmax(0, ${node.sizes[0]}fr)`,
+    `minmax(0, ${node.sizes[1]}fr)`,
+  ].join(" ");
+
+  return node.orientation === "horizontal"
+    ? { gridTemplateColumns: tracks }
+    : { gridTemplateRows: tracks };
+}
+
 function renderNode(
   node: WorkspaceNode,
   state: WorkspaceState,
-  onChange: WorkspaceViewProps["onChange"],
+  props: WorkspaceViewProps,
   suspended: boolean,
-  onResizeStart: () => void,
   floatingLeafId: string | null,
   closingFloatingLeafId: string | null,
   onOpenFloating: (leafId: string) => void,
   onCloseFloating: () => void,
   onCloseFloatingImmediately: () => void,
-  onAutoDistribute: () => void,
 ): JSX.Element {
   if (node.type === "leaf") {
     const isFloating = floatingLeafId === node.id;
@@ -55,21 +66,27 @@ function renderNode(
         active={state.activeLeafId === node.id}
         floating={isFloating}
         floatingClosing={closingFloatingLeafId === node.id}
-        onSelect={() => onChange((current) => setActiveLeaf(current, node.id))}
+        pinned={props.pinnedThreadIds?.includes(node.threadId) ?? false}
+        onSelect={() => props.onChange((current) => setActiveLeaf(current, node.id))}
         onClose={() => {
-          onChange((current) => closeLeafInWorkspace(current, node.id));
+          props.onChange((current) => closeLeafInWorkspace(current, node.id));
+          props.onCloseThread?.(node.threadId);
           if (isFloating) {
             onCloseFloatingImmediately();
           }
         }}
         onToggleCollapse={() =>
-          onChange((current) => toggleLeafCollapse(current, node.id))
+          props.onChange((current) => toggleLeafCollapse(current, node.id))
         }
-        onSwap={() => onChange((current) => swapWithSibling(current, node.id))}
+        onSwap={() => props.onChange((current) => swapWithSibling(current, node.id))}
+        onTogglePin={
+          props.onToggleThreadPin
+            ? () => props.onToggleThreadPin?.(node.threadId)
+            : undefined
+        }
         onToggleOrientation={() =>
-          onChange((current) => toggleParentOrientation(current, node.id))
+          props.onChange((current) => toggleParentOrientation(current, node.id))
         }
-        onAutoDistribute={onAutoDistribute}
         onToggleFloating={() => {
           if (isFloating) {
             onCloseFloating();
@@ -77,73 +94,57 @@ function renderNode(
           }
 
           if (node.collapsed) {
-            onChange((current) => toggleLeafCollapse(current, node.id));
+            props.onChange((current) => toggleLeafCollapse(current, node.id));
           }
-          onChange((current) => setActiveLeaf(current, node.id));
+          props.onChange((current) => setActiveLeaf(current, node.id));
           onOpenFloating(node.id);
         }}
       />
     );
   }
 
-  const layout = {
-    [node.children[0].id]: node.sizes[0],
-    [node.children[1].id]: node.sizes[1],
-  };
-
   return (
-    <Group
+    <div
       key={`${node.id}:${node.revision}`}
-      orientation={node.orientation}
-      defaultLayout={layout}
-      onLayoutChange={(nextLayout) =>
-        onChange((current) =>
-          updateSplitSizes(current, node.id, [
-            nextLayout[node.children[0].id] ?? node.sizes[0],
-            nextLayout[node.children[1].id] ?? node.sizes[1],
-          ]),
-        )
-      }
-      className={`workspace-group orientation-${node.orientation}`}
+      className={`workspace-split workspace-group orientation-${node.orientation}`}
+      style={splitLayoutStyle(node)}
     >
-      {node.children.map((child, index) => (
-        <Fragment key={child.id}>
-          <Panel
-            id={child.id}
-            minSize={child.type === "leaf" && child.collapsed ? "8%" : "20%"}
-          >
-            {renderNode(
-              child,
-              state,
-              onChange,
-              suspended,
-              onResizeStart,
-              floatingLeafId,
-              closingFloatingLeafId,
-              onOpenFloating,
-              onCloseFloating,
-              onCloseFloatingImmediately,
-              onAutoDistribute,
-            )}
-          </Panel>
-          {index === 0 ? (
-            <Separator
-              className="workspace-separator"
-              onPointerDown={onResizeStart}
-            />
-          ) : null}
-        </Fragment>
+      {node.children.map((child) => (
+        <div
+          key={child.id}
+          className="workspace-panel"
+          data-panel-id={child.id}
+        >
+          {renderNode(
+            child,
+            state,
+            props,
+            suspended,
+            floatingLeafId,
+            closingFloatingLeafId,
+            onOpenFloating,
+            onCloseFloating,
+            onCloseFloatingImmediately,
+          )}
+        </div>
       ))}
-    </Group>
+    </div>
   );
 }
 
-export function WorkspaceView({ state, onChange }: WorkspaceViewProps) {
+export function WorkspaceView(props: WorkspaceViewProps) {
+  const { state, onChange } = props;
   const [isResizing, setIsResizing] = useState(false);
   const [floatingLeafId, setFloatingLeafId] = useState<string | null>(null);
   const [closingFloatingLeafId, setClosingFloatingLeafId] = useState<string | null>(null);
   const settleTimerRef = useRef<number | null>(null);
   const floatingCloseTimerRef = useRef<number | null>(null);
+  const windowResizeTimerRef = useRef<number | null>(null);
+  const onChangeRef = useRef(onChange);
+
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
 
   const clearSettleTimer = () => {
     if (settleTimerRef.current != null) {
@@ -165,19 +166,17 @@ export function WorkspaceView({ state, onChange }: WorkspaceViewProps) {
     scheduleSettle();
   };
 
-  const beginResize = () => {
-    markLayoutChanging();
-  };
-
-  const autoDistribute = () => {
-    markLayoutChanging();
-    onChange(autoDistributeWorkspace);
-  };
-
   const clearFloatingCloseTimer = () => {
     if (floatingCloseTimerRef.current != null) {
       window.clearTimeout(floatingCloseTimerRef.current);
       floatingCloseTimerRef.current = null;
+    }
+  };
+
+  const clearWindowResizeTimer = () => {
+    if (windowResizeTimerRef.current != null) {
+      window.clearTimeout(windowResizeTimerRef.current);
+      windowResizeTimerRef.current = null;
     }
   };
 
@@ -211,28 +210,27 @@ export function WorkspaceView({ state, onChange }: WorkspaceViewProps) {
   }, [floatingLeafId, state.root]);
 
   useEffect(() => {
-    const settleResize = () => {
-      if (!isResizing) {
-        return;
-      }
-
-      scheduleSettle();
+    const redistributeAfterWindowResize = () => {
+      markLayoutChanging();
+      clearWindowResizeTimer();
+      windowResizeTimerRef.current = window.setTimeout(() => {
+        windowResizeTimerRef.current = null;
+        onChangeRef.current(autoDistributeWorkspace);
+      }, WINDOW_RESIZE_DISTRIBUTE_MS);
     };
 
-    window.addEventListener("pointerup", settleResize);
-    window.addEventListener("pointercancel", settleResize);
-    window.addEventListener("resize", markLayoutChanging);
+    window.addEventListener("resize", redistributeAfterWindowResize);
     return () => {
-      window.removeEventListener("pointerup", settleResize);
-      window.removeEventListener("pointercancel", settleResize);
-      window.removeEventListener("resize", markLayoutChanging);
+      window.removeEventListener("resize", redistributeAfterWindowResize);
+      clearWindowResizeTimer();
     };
-  }, [isResizing]);
+  }, []);
 
   useEffect(() => {
     return () => {
       clearSettleTimer();
       clearFloatingCloseTimer();
+      clearWindowResizeTimer();
     };
   }, []);
 
@@ -263,15 +261,13 @@ export function WorkspaceView({ state, onChange }: WorkspaceViewProps) {
       {renderNode(
         state.root,
         state,
-        onChange,
+        props,
         isResizing,
-        beginResize,
         floatingLeafId,
         closingFloatingLeafId,
         openFloating,
         closeFloating,
         closeFloatingImmediately,
-        autoDistribute,
       )}
     </section>
   );

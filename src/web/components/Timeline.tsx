@@ -306,6 +306,11 @@ export function Timeline({
       return;
     }
 
+    const stopFollowingForUserScroll = () => {
+      followScrollPending.current = false;
+      setFollowLatest(false);
+    };
+
     const syncScrollState = () => {
       const distanceToBottom =
         scrollerNode.scrollHeight - scrollerNode.clientHeight - scrollerNode.scrollTop;
@@ -329,10 +334,18 @@ export function Timeline({
 
     const frame = requestAnimationFrame(syncScrollState);
     scrollerNode.addEventListener("scroll", syncScrollState, { passive: true });
+    scrollerNode.addEventListener("wheel", stopFollowingForUserScroll, {
+      passive: true,
+    });
+    scrollerNode.addEventListener("touchmove", stopFollowingForUserScroll, {
+      passive: true,
+    });
     window.addEventListener("resize", syncScrollState);
     return () => {
       cancelAnimationFrame(frame);
       scrollerNode.removeEventListener("scroll", syncScrollState);
+      scrollerNode.removeEventListener("wheel", stopFollowingForUserScroll);
+      scrollerNode.removeEventListener("touchmove", stopFollowingForUserScroll);
       window.removeEventListener("resize", syncScrollState);
     };
   }, [scrollerNode, cards.length]);
@@ -478,7 +491,7 @@ export function Timeline({
             </button>
           ) : null}
 
-          {!followLatest && !isAtBottom ? (
+          {!isAtBottom ? (
             <button
               className="timeline-jump-button"
               onClick={jumpToBottom}

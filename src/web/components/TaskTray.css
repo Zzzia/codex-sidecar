@@ -1,0 +1,435 @@
+.task-tray {
+  flex: none;
+  position: relative;
+  z-index: 28;
+  display: grid;
+  padding: 0 12px 12px;
+}
+
+.task-tray-bar {
+  position: relative;
+  z-index: 3;
+  min-height: 42px;
+  display: grid;
+  grid-template-columns: auto auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid rgba(45, 42, 36, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 252, 0.94);
+  color: var(--muted);
+  box-shadow: 0 18px 34px rgba(52, 48, 40, 0.14);
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+}
+
+.task-tray.is-expanded .task-tray-bar {
+  border-top-color: rgba(45, 42, 36, 0.08);
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  background: rgba(255, 254, 249, 0.97);
+  box-shadow: 0 18px 34px rgba(52, 48, 40, 0.1);
+}
+
+.task-tray-bar span {
+  white-space: nowrap;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.task-tray-bar strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.8rem;
+  font-weight: 520;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-tray-panel {
+  position: absolute;
+  right: 12px;
+  bottom: calc(100% - 1px);
+  left: 12px;
+  z-index: 2;
+  max-height: min(520px, calc(100vh - 90px));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(45, 42, 36, 0.12);
+  border-bottom: 0;
+  border-radius: 14px 14px 0 0;
+  background: rgba(255, 254, 249, 0.97);
+  box-shadow: 0 -18px 46px rgba(42, 32, 23, 0.16);
+  backdrop-filter: blur(14px);
+}
+
+.task-tray-panel-header,
+.task-tray-limit,
+.task-tray-column header,
+.task-tray-column header span,
+.task-tray-item,
+.task-tray-item-preview,
+.task-tray-item-copy,
+.thread-preview-header,
+.thread-preview-title-wrap,
+.thread-preview-actions,
+.tray-action-button {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.task-tray-panel-header {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.task-tray-limit {
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.task-tray-segmented {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid rgba(45, 42, 36, 0.12);
+  border-radius: 10px;
+  background: rgba(245, 240, 232, 0.78);
+}
+
+.task-tray-segmented button {
+  min-width: 28px;
+  height: 26px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.task-tray-segmented button.is-active {
+  background: rgba(63, 128, 91, 0.12);
+  color: var(--accent);
+  font-weight: 650;
+}
+
+.task-tray-warning {
+  padding: 8px 10px;
+  border: 1px solid rgba(188, 129, 35, 0.18);
+  border-radius: 10px;
+  background: rgba(255, 248, 234, 0.82);
+  color: #7a561c;
+  font-size: 0.78rem;
+  text-align: left;
+}
+
+.task-tray-warning.is-clickable {
+  cursor: pointer;
+}
+
+.task-tray-columns {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.task-tray-column {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(45, 42, 36, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 252, 0.7);
+}
+
+.task-tray-column header {
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 10px;
+  border-bottom: 1px solid rgba(45, 42, 36, 0.08);
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.task-tray-column header span {
+  gap: 6px;
+}
+
+.task-tray-column header strong {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.task-tray-list {
+  min-height: 0;
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  padding: 6px;
+  overflow: hidden;
+}
+
+.task-tray-column.is-scrollable .task-tray-list {
+  max-height: 390px;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(92, 84, 72, 0.22) transparent;
+}
+
+.task-tray-item {
+  width: 100%;
+  gap: 8px;
+}
+
+.task-tray-item-preview {
+  min-width: 0;
+  flex: 1;
+  gap: 8px;
+  padding: 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.task-tray-item-preview:hover,
+.task-tray-item-preview:focus-visible {
+  background: rgba(72, 54, 33, 0.055);
+}
+
+.task-tray-item-copy {
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.task-tray-item-copy strong,
+.task-tray-item-project {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-tray-item-copy strong {
+  font-size: 0.79rem;
+  font-weight: 560;
+}
+
+.task-tray-item-project,
+.task-tray-item time {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.task-tray-item time {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.task-tray-pin-button {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(45, 42, 36, 0.08);
+  border-radius: 8px;
+  color: var(--muted);
+}
+
+.task-tray-pin-button:hover,
+.task-tray-pin-button:focus-visible {
+  color: var(--accent);
+  background: rgba(63, 128, 91, 0.08);
+}
+
+.task-tray-empty {
+  padding: 16px 10px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+.task-tray-mobile-tabs,
+.task-tray-mobile-panel {
+  display: none;
+}
+
+.thread-preview-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 42;
+  display: grid;
+  align-items: end;
+  justify-items: center;
+  padding: clamp(14px, 3vh, 28px) clamp(16px, 3vw, 36px)
+    clamp(22px, 5vh, 52px);
+  background: rgba(42, 32, 23, 0.24);
+  backdrop-filter: blur(7px);
+}
+
+.thread-preview-modal {
+  width: min(1080px, calc(100vw - 48px));
+  height: min(680px, calc(100vh - 108px));
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(45, 42, 36, 0.14);
+  border-radius: 14px;
+  background: #fffef9;
+  box-shadow: 0 28px 80px rgba(42, 32, 23, 0.28);
+}
+
+.thread-preview-header {
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(45, 42, 36, 0.09);
+  background: rgba(255, 255, 252, 0.94);
+}
+
+.thread-preview-title-wrap {
+  flex: 1;
+  gap: 7px;
+}
+
+.thread-preview-project,
+.thread-preview-title-wrap h2 {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.thread-preview-project,
+.thread-preview-divider {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.thread-preview-title-wrap h2 {
+  margin: 0;
+  font-size: 0.86rem;
+  font-weight: 560;
+}
+
+.thread-preview-actions {
+  flex: none;
+  gap: 6px;
+}
+
+.tray-action-button {
+  height: 32px;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid rgba(45, 42, 36, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 252, 0.78);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.tray-action-button.primary {
+  border-color: rgba(63, 128, 91, 0.2);
+  background: rgba(63, 128, 91, 0.1);
+  color: var(--accent);
+}
+
+.tray-action-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.tray-action-button span {
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.thread-preview-body {
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+  @media (max-width: 760px) {
+  .task-tray {
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+
+  .task-tray-panel {
+    right: 10px;
+    left: 10px;
+  }
+
+  .task-tray-bar {
+    grid-template-columns: repeat(3, auto) minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+
+  .task-tray-bar strong {
+    display: none;
+  }
+
+  .task-tray-columns {
+    display: none;
+  }
+
+  .task-tray-mobile-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .task-tray-mobile-tabs button {
+    min-width: 0;
+    padding: 7px 4px;
+    border: 1px solid rgba(45, 42, 36, 0.1);
+    border-radius: 9px;
+    background: rgba(255, 255, 252, 0.72);
+    color: var(--muted);
+    font-size: 0.74rem;
+  }
+
+  .task-tray-mobile-tabs button.is-active {
+    color: var(--accent);
+    border-color: rgba(63, 128, 91, 0.22);
+    background: rgba(63, 128, 91, 0.08);
+  }
+
+  .task-tray-mobile-panel {
+    min-height: 0;
+    display: block;
+  }
+
+  .thread-preview-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .thread-preview-modal {
+    width: calc(100vw - 28px);
+    height: min(620px, calc(100vh - 96px));
+  }
+
+  .thread-preview-actions {
+    flex-wrap: wrap;
+  }
+}
