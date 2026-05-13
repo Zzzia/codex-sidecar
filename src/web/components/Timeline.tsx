@@ -28,6 +28,15 @@ import {
 
 type TimelineScrollBehavior = "auto" | "smooth";
 
+function readTimelineScrollPosition(scrollerNode: HTMLElement) {
+  const distanceToBottom =
+    scrollerNode.scrollHeight - scrollerNode.clientHeight - scrollerNode.scrollTop;
+  return {
+    atTop: scrollerNode.scrollTop <= 8,
+    atBottom: distanceToBottom <= 8,
+  };
+}
+
 function TimelineFooterSpacer() {
   return <div className="timeline-end-spacer" aria-hidden="true" />;
 }
@@ -121,16 +130,10 @@ export function Timeline({
       return;
     }
 
-    const stopFollowingForUserScroll = () => {
-      followScrollPending.current = false;
-      setFollowLatest(false);
-    };
+    let userScrollFrame: number | null = null;
 
     const syncScrollState = () => {
-      const distanceToBottom =
-        scrollerNode.scrollHeight - scrollerNode.clientHeight - scrollerNode.scrollTop;
-      const atTop = scrollerNode.scrollTop <= 8;
-      const atBottom = distanceToBottom <= 8;
+      const { atTop, atBottom } = readTimelineScrollPosition(scrollerNode);
       scrollAnchorRef.current = readTimelineScrollAnchor(scrollerNode);
 
       setIsAtTop(atTop);
@@ -147,20 +150,38 @@ export function Timeline({
       setFollowLatest(atBottom);
     };
 
+    const queueScrollStateSync = () => {
+      if (userScrollFrame != null) {
+        return;
+      }
+      userScrollFrame = requestAnimationFrame(() => {
+        userScrollFrame = null;
+        syncScrollState();
+      });
+    };
+
+    const stopPendingProgrammaticScroll = () => {
+      followScrollPending.current = false;
+      queueScrollStateSync();
+    };
+
     const frame = requestAnimationFrame(syncScrollState);
     scrollerNode.addEventListener("scroll", syncScrollState, { passive: true });
-    scrollerNode.addEventListener("wheel", stopFollowingForUserScroll, {
+    scrollerNode.addEventListener("wheel", stopPendingProgrammaticScroll, {
       passive: true,
     });
-    scrollerNode.addEventListener("touchmove", stopFollowingForUserScroll, {
+    scrollerNode.addEventListener("touchmove", stopPendingProgrammaticScroll, {
       passive: true,
     });
     window.addEventListener("resize", syncScrollState);
     return () => {
       cancelAnimationFrame(frame);
+      if (userScrollFrame != null) {
+        cancelAnimationFrame(userScrollFrame);
+      }
       scrollerNode.removeEventListener("scroll", syncScrollState);
-      scrollerNode.removeEventListener("wheel", stopFollowingForUserScroll);
-      scrollerNode.removeEventListener("touchmove", stopFollowingForUserScroll);
+      scrollerNode.removeEventListener("wheel", stopPendingProgrammaticScroll);
+      scrollerNode.removeEventListener("touchmove", stopPendingProgrammaticScroll);
       window.removeEventListener("resize", syncScrollState);
     };
   }, [scrollerNode, cards.length]);
@@ -184,6 +205,19 @@ export function Timeline({
       }
     };
 
+    const syncPositionAfterResize = () => {
+      const { atTop, atBottom } = readTimelineScrollPosition(scrollerNode);
+      scrollAnchorRef.current = readTimelineScrollAnchor(scrollerNode);
+      setIsAtTop(atTop);
+      setIsAtBottom(atBottom);
+      if (atBottom) {
+        followScrollPending.current = false;
+      }
+      if (!followScrollPending.current) {
+        setFollowLatest(atBottom);
+      }
+    };
+
     const preserveAnchorAfterResize = () => {
       const anchor =
         scrollAnchorRef.current ?? readTimelineScrollAnchor(scrollerNode);
@@ -197,7 +231,7 @@ export function Timeline({
 
         if (anchor.atBottom || followLatestRef.current) {
           scrollerNode.scrollTop = scrollerNode.scrollHeight;
-          scrollAnchorRef.current = readTimelineScrollAnchor(scrollerNode);
+          syncPositionAfterResize();
           return;
         }
 
@@ -215,19 +249,48 @@ export function Timeline({
           if (!followLatestRef.current) {
             restoreTimelineScrollAnchor(scrollerNode, anchor);
           }
-          scrollAnchorRef.current = readTimelineScrollAnchor(scrollerNode);
+          syncPositionAfterResize();
         });
       });
     };
 
     const resizeObserver = new ResizeObserver(preserveAnchorAfterResize);
-    resizeObserver.observe(scrollerNode);
+    const observedElements = new Set<Element>();
+
+    const observeRenderedTimelineItems = () => {
+      const nextElements = new Set<Element>([
+        scrollerNode,
+        ...scrollerNode.querySelectorAll("[data-card-index], .timeline-end-spacer"),
+      ]);
+
+      for (const element of observedElements) {
+        if (!nextElements.has(element)) {
+          resizeObserver.unobserve(element);
+          observedElements.delete(element);
+        }
+      }
+
+      for (const element of nextElements) {
+        if (!observedElements.has(element)) {
+          resizeObserver.observe(element);
+          observedElements.add(element);
+        }
+      }
+    };
+    observeRenderedTimelineItems();
+
+    const mutationObserver = new MutationObserver(observeRenderedTimelineItems);
+    mutationObserver.observe(scrollerNode, {
+      childList: true,
+      subtree: true,
+    });
 
     return () => {
+      mutationObserver.disconnect();
       resizeObserver.disconnect();
       clearFrames();
     };
-  }, [scrollerNode]);
+  }, [scrollerNode, cards.length]);
 
   const jumpToBottom = () => {
     if (cards.length === 0) {

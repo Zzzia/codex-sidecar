@@ -30,3 +30,15 @@ test("MarkdownRenderer does not add copy controls to inline code", () => {
   assert.doesNotMatch(markup, /copyable-code-block/);
   assert.doesNotMatch(markup, /aria-label="复制代码块"/);
 });
+
+test("MarkdownRenderer keeps mermaid-labeled snippets as code blocks", () => {
+  const markup = renderToStaticMarkup(
+    React.createElement(MarkdownRenderer, {
+      text: "```mermaid\nB[BFF /conversations/{id}/turn]\n```",
+    }),
+  );
+
+  assert.match(markup, /copyable-code-block/);
+  assert.match(markup, /BFF \/conversations\/\{id\}\/turn/);
+  assert.doesNotMatch(markup, /Mermaid 渲染中/);
+});
