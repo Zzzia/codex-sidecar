@@ -304,7 +304,132 @@ test("normalizeRecord preserves plain exec command output from function_call_out
   assert.equal(events[0].name, "exec_command");
   assert.equal(events[0].result.exitCode, 0);
   assert.equal(events[0].result.success, true);
-  assert.match(events[0].result.outputText, /hello from shell/);
+  assert.equal(events[0].result.outputText, "hello from shell\n");
+  assert.equal(events[0].result.wallTimeSeconds, 0);
+});
+
+test("normalizeRecord strips running exec metadata while preserving process state", () => {
+  const events = normalizeRecord(
+    {
+      timestamp: "2026-05-19T09:00:00.000Z",
+      type: "response_item",
+      payload: {
+        type: "function_call_output",
+        call_id: "call-running",
+        output:
+          "Chunk ID: 09c1e0\n" +
+          "Wall time: 1.0006 seconds\n" +
+          "Process running with session ID 30947\n" +
+          "Original token count: 0\n" +
+          "Output:\n",
+      },
+    },
+    {
+      row,
+      callNames: new Map([["call-running", "exec_command"]]),
+      status: "running",
+    },
+    1,
+  );
+
+  assert.equal(events.length, 1);
+  assert.equal(events[0]?.kind, "tool_result");
+  if (events[0]?.kind !== "tool_result") {
+    assert.fail("expected tool_result event");
+  }
+  assert.equal(events[0].result.outputText, "");
+  assert.equal(events[0].result.exitCode, null);
+  assert.equal(events[0].result.success, null);
+  assert.equal(events[0].result.processId, "30947");
+  assert.equal(events[0].result.wallTimeSeconds, 1.0006);
+});
+
+test("normalizeRecord reads structured exec command function output", () => {
+  const events = normalizeRecord(
+    {
+      timestamp: "2026-05-19T09:00:01.000Z",
+      type: "response_item",
+      payload: {
+        type: "function_call_output",
+        call_id: "call-json",
+        output: JSON.stringify({
+          wall_time_seconds: 0.25,
+          exit_code: 7,
+          output: "json output\n",
+        }),
+      },
+    },
+    {
+      row,
+      callNames: new Map([["call-json", "exec_command"]]),
+      status: "running",
+    },
+    1,
+  );
+
+  assert.equal(events.length, 1);
+  assert.equal(events[0]?.kind, "tool_result");
+  if (events[0]?.kind !== "tool_result") {
+    assert.fail("expected tool_result event");
+  }
+  assert.equal(events[0].result.outputText, "json output\n");
+  assert.equal(events[0].result.exitCode, 7);
+  assert.equal(events[0].result.success, false);
+  assert.equal(events[0].result.wallTimeSeconds, 0.25);
+});
+
+test("normalizeRecord attaches write_stdin output to its session id", () => {
+  const context = {
+    row,
+    callNames: new Map<string, string>(),
+    callArguments: new Map<string, string>(),
+    status: "running" as const,
+  };
+
+  normalizeRecord(
+    {
+      timestamp: "2026-05-19T09:00:02.000Z",
+      type: "response_item",
+      payload: {
+        type: "function_call",
+        name: "write_stdin",
+        call_id: "call-stdin",
+        arguments: JSON.stringify({ session_id: 30947, chars: "" }),
+      },
+    },
+    context,
+    1,
+  );
+
+  const events = normalizeRecord(
+    {
+      timestamp: "2026-05-19T09:00:03.000Z",
+      type: "response_item",
+      payload: {
+        type: "function_call_output",
+        call_id: "call-stdin",
+        output:
+          "Chunk ID: c027f9\n" +
+          "Wall time: 4.0395 seconds\n" +
+          "Process exited with code 0\n" +
+          "Original token count: 100\n" +
+          "Output:\n" +
+          "done\n",
+      },
+    },
+    context,
+    2,
+  );
+
+  assert.equal(events.length, 1);
+  assert.equal(events[0]?.kind, "tool_result");
+  if (events[0]?.kind !== "tool_result") {
+    assert.fail("expected tool_result event");
+  }
+  assert.equal(events[0].name, "write_stdin");
+  assert.equal(events[0].result.outputText, "done\n");
+  assert.equal(events[0].result.exitCode, 0);
+  assert.equal(events[0].result.processId, "30947");
 });
 
 test("normalizeRecord extracts patch changes from patch_apply_end", () => {

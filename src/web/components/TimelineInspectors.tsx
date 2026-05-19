@@ -35,6 +35,28 @@ function renderPageModal(content: ReactNode): ReactNode {
   return createPortal(content, document.body);
 }
 
+function formatWallTime(seconds: number): string {
+  return seconds < 10 ? `${seconds.toFixed(4)}s` : `${seconds.toFixed(2)}s`;
+}
+
+function commandExecutionState(tool: ToolRunView): string {
+  if (tool.name !== "exec_command" || !tool.result) {
+    return "";
+  }
+
+  if (tool.result.processId) {
+    return `后台运行中 · session ${tool.result.processId}`;
+  }
+
+  if (tool.result.exitCode != null) {
+    return tool.result.exitCode === 0
+      ? "已完成 · exit 0"
+      : `已结束 · exit ${tool.result.exitCode}`;
+  }
+
+  return "";
+}
+
 function PatchFilePreviewButton({
   fileName,
   filePath,
@@ -302,6 +324,7 @@ function ToolRunDetails({
 }) {
   const invocationText = tool.commandText || tool.invocationText;
   const invocationTitle = tool.commandText ? "命令" : "调用内容";
+  const executionState = commandExecutionState(tool);
 
   return (
     <>
@@ -311,6 +334,13 @@ function ToolRunDetails({
           <CopyableCodeBlock className="code-block" copyText={invocationText}>
             {invocationText}
           </CopyableCodeBlock>
+        </section>
+      ) : null}
+
+      {executionState ? (
+        <section className="tool-modal-section">
+          <h4>执行状态</h4>
+          <div className="tool-execution-state">{executionState}</div>
         </section>
       ) : null}
 
@@ -389,6 +419,10 @@ export function ToolDetailsModal({
         <div className="tool-modal-meta">
           <span>{formatTimestamp(tool.ts)}</span>
           {tool.result?.exitCode != null ? <span>exit {tool.result.exitCode}</span> : null}
+          {tool.result?.processId ? <span>session {tool.result.processId}</span> : null}
+          {tool.result?.wallTimeSeconds != null ? (
+            <span>{formatWallTime(tool.result.wallTimeSeconds)}</span>
+          ) : null}
           {tool.patchSummary ? <span>{tool.patchSummary}</span> : null}
         </div>
 

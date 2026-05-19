@@ -50,6 +50,10 @@ function toolBadgeText(tool: ToolRunView): string {
     return "";
   }
 
+  if (tool.name === "exec_command" && tool.result?.processId) {
+    return "运行中";
+  }
+
   return tool.status === "completed" ? "" : tool.status ?? "";
 }
 

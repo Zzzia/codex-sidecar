@@ -112,6 +112,9 @@ export interface ToolResultPayload {
   stderrText: string;
   parsedCommands?: ParsedCommand[];
   raw: unknown;
+  processId?: string;
+  wallTimeSeconds?: number;
+  outputLineCount?: number;
 }
 
 export interface PatchChange {

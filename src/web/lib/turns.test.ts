@@ -436,6 +436,81 @@ test("buildTurnCards filters write_stdin tool events", () => {
   assert.equal(cards[0]?.blocks[0]?.type, "assistant_markdown");
 });
 
+test("buildTurnCards merges write_stdin output into matching background exec", () => {
+  const events: TimelineEvent[] = [
+    {
+      id: "u1",
+      ts: "2026-05-19T09:00:00.000Z",
+      kind: "message",
+      role: "user",
+      text: "跑构建",
+      isPlan: false,
+    },
+    {
+      id: "c1",
+      ts: "2026-05-19T09:00:01.000Z",
+      kind: "tool_call",
+      callId: "call-exec",
+      tool: {
+        name: "exec_command",
+        argumentsText: "{\"cmd\":\"pnpm build\"}",
+        toolType: "function_call",
+      },
+    },
+    {
+      id: "r1",
+      ts: "2026-05-19T09:00:02.000Z",
+      kind: "tool_result",
+      callId: "call-exec",
+      name: "exec_command",
+      result: {
+        toolType: "function_call_output",
+        title: "exec_command",
+        success: null,
+        exitCode: null,
+        outputText: "building...\n",
+        stderrText: "",
+        processId: "99451",
+        wallTimeSeconds: 1.0013,
+        raw: {},
+      },
+    },
+    {
+      id: "stdin-result",
+      ts: "2026-05-19T09:00:03.000Z",
+      kind: "tool_result",
+      callId: "call-stdin",
+      name: "write_stdin",
+      result: {
+        toolType: "function_call_output",
+        title: "write_stdin",
+        success: true,
+        exitCode: 0,
+        outputText: "done\n",
+        stderrText: "",
+        processId: "99451",
+        wallTimeSeconds: 4.0395,
+        raw: {},
+      },
+    },
+  ];
+
+  const cards = buildTurnCards(events);
+  assert.equal(cards.length, 1);
+  assert.equal(cards[0]?.blocks.length, 1);
+  assert.equal(cards[0]?.blocks[0]?.type, "tool_runs");
+  if (cards[0]?.blocks[0]?.type !== "tool_runs") {
+    assert.fail("expected tool runs block");
+  }
+  const tool = cards[0].blocks[0].items[0];
+  assert.equal(tool?.name, "exec_command");
+  assert.equal(tool?.result?.outputText, "building...\ndone\n");
+  assert.equal(tool?.result?.exitCode, 0);
+  assert.equal(tool?.result?.success, true);
+  assert.equal(tool?.result?.processId, undefined);
+  assert.equal(cards[0].blocks[0].items.length, 1);
+});
+
 test("buildTurnCards splits rounds when a new running status appears after completion", () => {
   const events: TimelineEvent[] = [
     {

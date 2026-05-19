@@ -1,16 +1,29 @@
 import path from "node:path";
 import type {
-  PatchChange,
-  ParsedCommand,
   ThreadStatus,
   TimelineEvent,
-  ToolResultPayload,
 } from "../../shared/types.js";
 import type { ThreadRow } from "./types.js";
+import { normalizePatchChanges } from "./normalizePatch.js";
+import {
+  normalizeExecResult,
+  normalizeParsedCommands,
+  normalizeToolOutput,
+} from "./normalizeToolOutput.js";
+import {
+  extractTextContent,
+  getMessageRole,
+  splitProposedPlanBlocks,
+  stripMemoryCitationBlocks,
+  summarizeThreadText,
+} from "./normalizeText.js";
+
+export { summarizeThreadText } from "./normalizeText.js";
 
 interface RuntimeContext {
   row: ThreadRow;
   callNames: Map<string, string>;
+  callArguments?: Map<string, string>;
   status: ThreadStatus;
 }
 
@@ -21,344 +34,6 @@ function createEventId(
   suffix?: string,
 ): string {
   return [ts, rawType, lineNumber, suffix].filter(Boolean).join(":");
-}
-
-function displayPath(filePath: string, cwd: string): string {
-  if (filePath.startsWith(cwd)) {
-    return path.relative(cwd, filePath) || path.basename(filePath);
-  }
-  return filePath;
-}
-
-const THREAD_SUMMARY_TEXT_LIMIT = 100;
-const MEMORY_CITATION_OPEN = "<oai-mem-citation>";
-const MEMORY_CITATION_CLOSE = "</oai-mem-citation>";
-const PROPOSED_PLAN_OPEN = "<proposed_plan>";
-const PROPOSED_PLAN_CLOSE = "</proposed_plan>";
-
-type AssistantTextSegment = {
-  kind: "message" | "plan";
-  text: string;
-};
-
-export function summarizeThreadText(
-  value: string,
-  limit = THREAD_SUMMARY_TEXT_LIMIT,
-): string {
-  const normalized = value.replace(/\s+/g, " ").trim();
-  if (!normalized) {
-    return "";
-  }
-
-  const chars = Array.from(normalized);
-  if (chars.length <= limit) {
-    return normalized;
-  }
-
-  return `${chars.slice(0, Math.max(0, limit - 1)).join("")}…`;
-}
-
-function extractTextContent(content: unknown): string {
-  if (!Array.isArray(content)) {
-    return "";
-  }
-
-  return content
-    .map((entry) => {
-      if (!entry || typeof entry !== "object") {
-        return "";
-      }
-      const part = entry as Record<string, unknown>;
-      const text = part.text;
-      return typeof text === "string" ? text : "";
-    })
-    .filter(Boolean)
-    .join("");
-}
-
-function stripMemoryCitationBlocks(text: string): string {
-  let visibleText = "";
-  let cursor = 0;
-
-  while (cursor < text.length) {
-    const openIndex = text.indexOf(MEMORY_CITATION_OPEN, cursor);
-    if (openIndex === -1) {
-      visibleText += text.slice(cursor);
-      break;
-    }
-
-    visibleText += text.slice(cursor, openIndex);
-
-    const bodyStart = openIndex + MEMORY_CITATION_OPEN.length;
-    const closeIndex = text.indexOf(MEMORY_CITATION_CLOSE, bodyStart);
-    if (closeIndex === -1) {
-      break;
-    }
-
-    cursor = closeIndex + MEMORY_CITATION_CLOSE.length;
-  }
-
-  return visibleText;
-}
-
-function splitPreservingLineEndings(text: string): string[] {
-  return text.match(/[^\n]*(?:\n|$)/g)?.filter((line) => line.length > 0) ?? [];
-}
-
-function splitProposedPlanBlocks(text: string): AssistantTextSegment[] {
-  const segments: AssistantTextSegment[] = [];
-  let currentKind: AssistantTextSegment["kind"] = "message";
-  let currentText = "";
-
-  const pushCurrent = () => {
-    if (!currentText.trim()) {
-      currentText = "";
-      return;
-    }
-    segments.push({ kind: currentKind, text: currentText });
-    currentText = "";
-  };
-
-  for (const line of splitPreservingLineEndings(text)) {
-    const normalizedLine = line.replace(/\r?\n$/, "").trim();
-    if (currentKind === "message" && normalizedLine === PROPOSED_PLAN_OPEN) {
-      pushCurrent();
-      currentKind = "plan";
-      continue;
-    }
-
-    if (currentKind === "plan" && normalizedLine === PROPOSED_PLAN_CLOSE) {
-      pushCurrent();
-      currentKind = "message";
-      continue;
-    }
-
-    currentText += line;
-  }
-
-  pushCurrent();
-  return segments;
-}
-
-function parseJsonString(value: unknown): unknown {
-  if (typeof value !== "string") {
-    return value;
-  }
-
-  try {
-    return JSON.parse(value);
-  } catch {
-    return value;
-  }
-}
-
-function parseExitCodeFromOutput(outputText: string): number | null {
-  const match = outputText.match(/Process exited with code (-?\d+)/);
-  if (!match?.[1]) {
-    return null;
-  }
-
-  const exitCode = Number(match[1]);
-  return Number.isInteger(exitCode) ? exitCode : null;
-}
-
-function normalizeToolOutput(
-  payload: Record<string, unknown>,
-  fallbackTitle: string,
-): ToolResultPayload {
-  const rawOutput = typeof payload.output === "string" ? payload.output : "";
-  const parsed = parseJsonString(payload.output);
-  const data =
-    parsed && typeof parsed === "object"
-      ? (parsed as Record<string, unknown>)
-      : ({} as Record<string, unknown>);
-  const metadata =
-    data.metadata && typeof data.metadata === "object"
-      ? (data.metadata as Record<string, unknown>)
-      : {};
-  const outputText = typeof data.output === "string" ? data.output : "";
-  const stderrText = typeof data.stderr === "string" ? data.stderr : "";
-  const exitCode =
-    typeof metadata.exit_code === "number"
-      ? metadata.exit_code
-      : parseExitCodeFromOutput(rawOutput);
-  const visibleOutput = outputText || rawOutput;
-
-  return {
-    toolType:
-      payload.type === "custom_tool_call_output"
-        ? "custom_tool_call_output"
-        : "function_call_output",
-    title: fallbackTitle,
-    success: exitCode === null ? null : exitCode === 0,
-    exitCode,
-    outputText: visibleOutput,
-    stderrText,
-    parsedCommands: [],
-    raw: parsed,
-  };
-}
-
-function normalizeParsedCommands(value: unknown): ParsedCommand[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value
-    .map((entry) => {
-      if (!entry || typeof entry !== "object") {
-        return null;
-      }
-
-      const record = entry as Record<string, unknown>;
-      const type = record.type;
-      const cmd = typeof record.cmd === "string" ? record.cmd : "";
-
-      if (type === "read") {
-        const name = typeof record.name === "string" ? record.name : "";
-        const filePath = typeof record.path === "string" ? record.path : "";
-        if (!name || !filePath) {
-          return null;
-        }
-        return {
-          type,
-          cmd,
-          name,
-          path: filePath,
-        } satisfies ParsedCommand;
-      }
-
-      if (type === "search") {
-        return {
-          type,
-          cmd,
-          query: typeof record.query === "string" ? record.query : null,
-          path: typeof record.path === "string" ? record.path : null,
-        } satisfies ParsedCommand;
-      }
-
-      if (type === "list_files") {
-        return {
-          type,
-          cmd,
-          path: typeof record.path === "string" ? record.path : null,
-        } satisfies ParsedCommand;
-      }
-
-      if (type === "unknown") {
-        return {
-          type,
-          cmd,
-        } satisfies ParsedCommand;
-      }
-
-      return null;
-    })
-    .filter((entry): entry is ParsedCommand => Boolean(entry));
-}
-
-function normalizeExecResult(
-  payload: Record<string, unknown>,
-  fallbackTitle: string,
-): ToolResultPayload {
-  return {
-    toolType: "exec_command_end",
-    title: fallbackTitle,
-    success:
-      typeof payload.exit_code === "number" ? payload.exit_code === 0 : null,
-    exitCode: typeof payload.exit_code === "number" ? payload.exit_code : null,
-    outputText:
-      typeof payload.aggregated_output === "string"
-        ? payload.aggregated_output
-        : "",
-    stderrText:
-      typeof payload.stderr === "string" ? payload.stderr : "",
-    parsedCommands: normalizeParsedCommands(payload.parsed_cmd),
-    raw: payload,
-  };
-}
-
-function getMessageRole(role: unknown): "assistant" | "user" | "system" {
-  if (role === "assistant" || role === "user") {
-    return role;
-  }
-  return "system";
-}
-
-function normalizePatchContent(content: string): string[] {
-  const normalized = content.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-  if (!normalized) {
-    return [];
-  }
-
-  const lines = normalized.split("\n");
-  if (lines.at(-1) === "") {
-    lines.pop();
-  }
-  return lines;
-}
-
-function synthesizeUnifiedDiff(
-  filePath: string,
-  displayName: string,
-  info: Record<string, unknown>,
-): string {
-  if (typeof info.unified_diff === "string" && info.unified_diff.trim()) {
-    const movePath = typeof info.move_path === "string" ? info.move_path : "";
-    if (!movePath) {
-      return info.unified_diff;
-    }
-
-    return `${info.unified_diff}\n\nMoved to: ${movePath}`;
-  }
-
-  const content = typeof info.content === "string" ? info.content : "";
-  const lines = normalizePatchContent(content);
-  const fileLabel = displayName || path.basename(filePath) || filePath;
-
-  if (info.type === "add") {
-    return [
-      "--- /dev/null",
-      `+++ b/${fileLabel}`,
-      `@@ -0,0 +1,${lines.length} @@`,
-      ...lines.map((line) => `+${line}`),
-    ].join("\n");
-  }
-
-  if (info.type === "delete") {
-    return [
-      `--- a/${fileLabel}`,
-      "+++ /dev/null",
-      `@@ -1,${lines.length} +0,0 @@`,
-      ...lines.map((line) => `-${line}`),
-    ].join("\n");
-  }
-
-  return "";
-}
-
-function normalizePatchChanges(changes: unknown, cwd: string): PatchChange[] {
-  if (!changes || typeof changes !== "object") {
-    return [];
-  }
-
-  return Object.entries(changes as Record<string, unknown>).map(
-    ([filePath, entry]) => {
-      const info =
-        entry && typeof entry === "object"
-          ? (entry as Record<string, unknown>)
-          : {};
-
-      const shownPath = displayPath(filePath, cwd);
-
-      return {
-        path: filePath,
-        displayPath: shownPath,
-        changeType: typeof info.type === "string" ? info.type : "update",
-        unifiedDiff: synthesizeUnifiedDiff(filePath, shownPath, info),
-      };
-    },
-  );
 }
 
 function countReplacementHistoryItems(payload: Record<string, unknown>): number | undefined {
@@ -607,8 +282,15 @@ export function normalizeRecord(
     if (type === "function_call" || type === "custom_tool_call") {
       const name = typeof payload.name === "string" ? payload.name : "tool";
       const callId = typeof payload.call_id === "string" ? payload.call_id : "";
+      const argumentsText =
+        typeof payload.arguments === "string"
+          ? payload.arguments
+          : typeof payload.input === "string"
+            ? payload.input
+            : "";
       if (callId) {
         context.callNames.set(callId, name);
+        context.callArguments?.set(callId, argumentsText);
       }
 
       return [
@@ -619,12 +301,7 @@ export function normalizeRecord(
           callId,
           tool: {
             name,
-            argumentsText:
-              typeof payload.arguments === "string"
-                ? payload.arguments
-                : typeof payload.input === "string"
-                  ? payload.input
-                  : "",
+            argumentsText,
             status: typeof payload.status === "string" ? payload.status : undefined,
             toolType: type,
             parsedCommands: normalizeParsedCommands(payload.parsed_cmd),
@@ -636,6 +313,7 @@ export function normalizeRecord(
     if (type === "function_call_output" || type === "custom_tool_call_output") {
       const callId = typeof payload.call_id === "string" ? payload.call_id : "";
       const name = context.callNames.get(callId) ?? "tool";
+      const argumentsText = context.callArguments?.get(callId) ?? "";
       if (name === "apply_patch") {
         return [];
       }
@@ -647,7 +325,7 @@ export function normalizeRecord(
           kind: "tool_result",
           callId,
           name,
-          result: normalizeToolOutput(payload, name),
+          result: normalizeToolOutput(payload, name, argumentsText),
         },
       ];
     }

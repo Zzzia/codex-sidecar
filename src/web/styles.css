@@ -270,6 +270,11 @@ a {
   color: var(--muted);
 }
 
+.tool-execution-state {
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
 .tool-patch-list {
   display: grid;
   gap: 10px;

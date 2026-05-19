@@ -110,9 +110,12 @@ test("ToolDetailsModal renders command output text", () => {
       title: "exec_command",
       success: true,
       exitCode: 0,
-      outputText: "Chunk ID: abc123\nOutput:\n/workspace/demo\n",
+      outputText: "/workspace/demo\n",
       stderrText: "",
-      raw: "Chunk ID: abc123\nOutput:\n/workspace/demo\n",
+      raw: {
+        rawOutput: "Chunk ID: abc123\nWall time: 0.0000 seconds\nOutput:\n/workspace/demo\n",
+      },
+      wallTimeSeconds: 0,
     },
     patchSummary: null,
     patchSuccess: null,
@@ -130,4 +133,50 @@ test("ToolDetailsModal renders command output text", () => {
 
   assert.match(markup, />工具输出</);
   assert.match(markup, /\/workspace\/demo/);
+  assert.doesNotMatch(markup, /Chunk ID/);
+});
+
+test("ToolDetailsModal renders running command state without fake output", () => {
+  const tool: ToolRunView = {
+    callId: "call-1",
+    id: "call-1",
+    ts: "2026-05-19T09:00:00.000Z",
+    name: "exec_command",
+    preview: "sleep 10",
+    invocationText: "{\"cmd\":\"sleep 10\"}",
+    commandText: "sleep 10",
+    parsedCommands: [],
+    toolType: "function_call",
+    status: "completed",
+    result: {
+      toolType: "function_call_output",
+      title: "exec_command",
+      success: null,
+      exitCode: null,
+      outputText: "",
+      stderrText: "",
+      raw: {
+        rawOutput:
+          "Chunk ID: 09c1e0\nWall time: 1.0006 seconds\nProcess running with session ID 30947\nOutput:\n",
+      },
+      processId: "30947",
+      wallTimeSeconds: 1.0006,
+    },
+    patchSummary: null,
+    patchSuccess: null,
+    patchChanges: [],
+    placement: "tool",
+  };
+
+  const markup = renderToStaticMarkup(
+    React.createElement(ToolDetailsModal, {
+      tool,
+      localFileContext: null,
+      onClose: () => undefined,
+    }),
+  );
+
+  assert.match(markup, />执行状态</);
+  assert.match(markup, /后台运行中 · session 30947/);
+  assert.doesNotMatch(markup, />工具输出</);
 });

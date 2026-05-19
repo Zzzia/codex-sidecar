@@ -348,6 +348,58 @@ function placeToolRun(turn: MutableTurn, tool: ToolRunView): void {
   tool.placement = "tool";
 }
 
+function findExecToolByProcessId(
+  turn: MutableTurn,
+  processId: string,
+): ToolRunView | null {
+  for (const tool of turn.toolMap.values()) {
+    if (tool.name === "exec_command" && tool.result?.processId === processId) {
+      return tool;
+    }
+  }
+
+  return null;
+}
+
+function appendOutputText(currentText: string, nextText: string): string {
+  if (!currentText) {
+    return nextText;
+  }
+  if (!nextText) {
+    return currentText;
+  }
+  return `${currentText}${nextText}`;
+}
+
+function mergeWriteStdinResultIntoExec(
+  turn: MutableTurn,
+  result: NonNullable<ToolRunView["result"]>,
+): void {
+  if (!result.processId) {
+    return;
+  }
+
+  const tool = findExecToolByProcessId(turn, result.processId);
+  if (!tool?.result) {
+    return;
+  }
+
+  tool.result = {
+    ...tool.result,
+    success: result.success ?? tool.result.success,
+    exitCode: result.exitCode ?? tool.result.exitCode,
+    outputText: appendOutputText(tool.result.outputText, result.outputText),
+    stderrText: appendOutputText(tool.result.stderrText, result.stderrText),
+    processId: result.exitCode == null ? result.processId : undefined,
+    wallTimeSeconds: result.wallTimeSeconds ?? tool.result.wallTimeSeconds,
+    outputLineCount: result.outputLineCount ?? tool.result.outputLineCount,
+    raw: {
+      initial: tool.result.raw,
+      latest: result.raw,
+    },
+  };
+}
+
 function appendMarkdownBlock(turn: MutableTurn, text: string): void {
   const last = turn.blocks[turn.blocks.length - 1];
   if (last?.type === "assistant_markdown") {
@@ -553,7 +605,12 @@ export function buildTurnCards(events: TimelineEvent[]): TurnCardView[] {
     }
 
     if (event.kind === "tool_result") {
-      if (event.name === "update_plan" || event.name === "write_stdin") {
+      if (event.name === "update_plan") {
+        continue;
+      }
+
+      if (event.name === "write_stdin") {
+        mergeWriteStdinResultIntoExec(current, event.result);
         continue;
       }
 

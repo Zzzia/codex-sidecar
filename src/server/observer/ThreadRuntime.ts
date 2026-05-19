@@ -29,6 +29,7 @@ export class ThreadRuntime {
   private readonly events: TimelineEvent[] = [];
   private readonly emitter = new EventEmitter();
   private readonly callNames = new Map<string, string>();
+  private readonly callArguments = new Map<string, string>();
   private readonly listenerPriorities = new Map<
     (event: TimelineEvent, cursor: number) => void,
     ThreadStreamPriority
@@ -243,6 +244,7 @@ export class ThreadRuntime {
       {
         row: this.row,
         callNames: this.callNames,
+        callArguments: this.callArguments,
         status: this.status,
       },
       lineNumber,
