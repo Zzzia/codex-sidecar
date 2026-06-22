@@ -44,10 +44,10 @@ function countReplacementHistoryItems(payload: Record<string, unknown>): number 
 
 function describeCompactionDetail(replacementItemCount: number | undefined): string {
   if (typeof replacementItemCount !== "number") {
-    return "Codex 正在整理长会话上下文";
+    return "Codex is organizing long-session context";
   }
 
-  return `Codex 正在整理长会话上下文，压缩后保留 ${replacementItemCount} 条历史项`;
+  return `Codex is organizing long-session context, keeping ${replacementItemCount} history items`;
 }
 
 export function createThreadSummary(row: ThreadRow) {
@@ -99,8 +99,8 @@ export function normalizeRecord(
           ts,
           kind: "status",
           status: "running",
-          title: "对话开始",
-          detail: "Codex 已进入执行中状态",
+          title: "Turn started",
+          detail: "Codex is running",
         },
       ];
     }
@@ -113,8 +113,8 @@ export function normalizeRecord(
           ts,
           kind: "status",
           status: "completed",
-          title: "对话结束",
-          detail: "当前回合输出已结束",
+          title: "Turn completed",
+          detail: "Current turn output has finished",
         },
       ];
     }
@@ -127,8 +127,8 @@ export function normalizeRecord(
           ts,
           kind: "status",
           status: "completed",
-          title: "对话中断",
-          detail: "当前回合已被用户中断",
+          title: "Turn interrupted",
+          detail: "Current turn was interrupted by the user",
         },
       ];
     }
@@ -140,8 +140,8 @@ export function normalizeRecord(
           ts,
           kind: "compaction",
           state: "completed",
-          title: "上下文压缩完成",
-          detail: "Codex 已完成长会话上下文压缩",
+          title: "Context compaction completed",
+          detail: "Codex has completed long-session context compaction",
         },
       ];
     }
@@ -206,8 +206,8 @@ export function normalizeRecord(
           callId,
           success,
           summary: success
-            ? `已更新 ${changes.length} 个文件`
-            : "补丁应用失败",
+            ? `Updated ${changes.length} ${changes.length === 1 ? "file" : "files"}`
+            : "Patch apply failed",
           changes,
         },
       ];
@@ -225,7 +225,7 @@ export function normalizeRecord(
         ts,
         kind: "compaction",
         state: "running",
-        title: "正在压缩上下文",
+        title: "Compacting context",
         detail: describeCompactionDetail(replacementItemCount),
         replacementItemCount,
       },
@@ -243,10 +243,10 @@ export function normalizeRecord(
           ts,
           kind: "compaction",
           state: hasEncryptedContent ? "completed" : "running",
-          title: hasEncryptedContent ? "上下文压缩完成" : "正在压缩上下文",
+          title: hasEncryptedContent ? "Context compaction completed" : "Compacting context",
           detail: hasEncryptedContent
-            ? "Codex 已生成压缩后的加密上下文"
-            : "Codex 正在生成压缩后的上下文",
+            ? "Codex generated compacted encrypted context"
+            : "Codex is generating compacted context",
         },
       ];
     }

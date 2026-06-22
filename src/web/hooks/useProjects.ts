@@ -16,7 +16,7 @@ interface ProjectsState {
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(`请求失败: ${response.status}`);
+    throw new Error(`Request failed: ${response.status}`);
   }
   return (await response.json()) as T;
 }
@@ -182,7 +182,7 @@ export function useProjects(): ProjectsState {
           setError(
             requestError instanceof Error
               ? requestError.message
-              : "项目列表加载失败",
+              : "Failed to load projects",
           );
         }
       } finally {

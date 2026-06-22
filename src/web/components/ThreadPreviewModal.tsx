@@ -24,8 +24,8 @@ export function ThreadPreviewModal(props: ThreadPreviewModalProps) {
 
   return (
     <PreviewModalShell
-      ariaLabel="会话预览"
-      eyebrow="会话预览"
+      ariaLabel="Session preview"
+      eyebrow="Session preview"
       title={
         <>
           <div className={`status-dot status-${status}`} />
@@ -43,11 +43,11 @@ export function ThreadPreviewModal(props: ThreadPreviewModalProps) {
             type="button"
             className="tray-action-button"
             disabled={!canArchive}
-            title={canArchive ? "已看完并收纳" : "运行中的会话暂不收纳"}
+            title={canArchive ? "Reviewed and archived" : "Running sessions cannot be archived"}
             onClick={() => props.onArchive(props.threadId)}
           >
             <Archive size={14} />
-            <span>已看完并收纳</span>
+            <span>Reviewed and archived</span>
           </button>
           <button
             type="button"
@@ -55,14 +55,14 @@ export function ThreadPreviewModal(props: ThreadPreviewModalProps) {
             onClick={() => props.onPinToMain(props.threadId)}
           >
             <LayoutPanelTop size={14} />
-            <span>放到主面板</span>
+            <span>Pin to main area</span>
           </button>
         </>
       }
       bodyClassName="thread-preview-body"
       onClose={props.onClose}
     >
-      {loading ? <div className="pane-placeholder">会话加载中…</div> : null}
+      {loading ? <div className="pane-placeholder">Loading session...</div> : null}
       {error ? <div className="pane-error">{error}</div> : null}
       {!loading && !error ? (
         <>

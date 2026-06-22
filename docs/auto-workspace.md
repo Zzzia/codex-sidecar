@@ -1,27 +1,27 @@
-# 自动工作区与任务托盘
+# Auto Workspace and Task Tray
 
-自动工作区负责把活跃 Codex CLI 会话放入主面板，并把超出主面板容量或等待查看的会话收拢到底部任务托盘。
+The auto workspace keeps active Codex CLI sessions in the main pane area and moves overflow or review-ready sessions into the bottom task tray.
 
-## 状态来源
+## State Sources
 
-- 活跃会话来自 `GET /api/threads/active`。
-- 已知会话状态刷新继续使用 `GET /api/thread-summaries?id=...`。
-- 主面板容量单独持久化到 `codex-app.auto-workspace.max-panes.v1`。
-- 自动工作区状态单独持久化到 `codex-app.auto-workspace.v1`，不迁移旧的 `codex-app.workspace.v1`。
+- Active sessions come from `GET /api/threads/active`.
+- Known session status refresh continues to use `GET /api/thread-summaries?id=...`.
+- The main pane capacity is persisted separately in `codex-app.auto-workspace.max-panes.v1`.
+- Auto workspace state is persisted separately in `codex-app.auto-workspace.v1`; it does not migrate the legacy `codex-app.workspace.v1` value.
 
-## 主面板规则
+## Main Pane Rules
 
-- 默认最多展示 3 个会话，UI 支持切换为 `2 / 3 / 4 / 5 / 6`。
-- 新出现的 running 会话优先进入主面板；主面板已满时进入托盘的“运行中”。
-- 手动“放到主面板”的会话会被固定，不会被自动挤出。
-- 调低容量时优先移出未固定会话；如果固定数量超过新上限，不强制关闭。
-- 调高容量时，从托盘“运行中”按最近更新时间补入主面板。
+- The default capacity is 3 sessions, and the UI supports `2 / 3 / 4 / 5 / 6`.
+- Newly discovered running sessions enter the main area first; when the main area is full, they enter the tray's running group.
+- Sessions manually pinned to the main area are fixed and are not automatically evicted.
+- When capacity is reduced, unpinned sessions are removed first. If the pinned count exceeds the new limit, the app does not force-close them.
+- When capacity is increased, running tray sessions are added back to the main area by most recent update time.
 
-## 托盘规则
+## Tray Rules
 
-- 托盘默认以底部浮动条收起，不参与分栏布局。
-- 托盘分为“待处理”“运行中”“已收纳”。
-- “运行中”里的会话结束后进入“待处理”。
-- 点击托盘项只打开全屏预览，不改变主面板。
-- 关闭待处理预览或点击“已看完并收纳”后进入“已收纳”。
-- “已收纳”最多保留最近 50 条，列表高度超过约 10 条后内部滚动。
+- The tray is collapsed as a floating bottom bar by default and does not participate in split-pane layout.
+- The tray has three groups: needs review, running, and archived.
+- Running sessions in the tray move to needs review after they finish.
+- Clicking a tray item opens a full-screen preview only; it does not change the main pane layout.
+- Closing a needs-review preview or clicking "Reviewed and archived" moves the session to archived.
+- Archived keeps the latest 50 sessions. Once the list is around 10 items tall, it scrolls internally.

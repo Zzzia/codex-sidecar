@@ -65,10 +65,10 @@ export function CopyableCodeBlock({
   );
   const title =
     copyStatus === "copied"
-      ? "已复制"
+      ? "Copied"
       : copyStatus === "failed"
-        ? "复制失败"
-        : "复制代码块";
+        ? "Copy failed"
+        : "Copy code block";
 
   useEffect(() => {
     if (copyStatus === "idle") {
@@ -89,7 +89,7 @@ export function CopyableCodeBlock({
       await writeClipboardText(textToCopy);
       setCopyStatus("copied");
     } catch (error: unknown) {
-      console.warn("复制代码块失败", error);
+      console.warn("Failed to copy code block", error);
       setCopyStatus("failed");
     }
   };

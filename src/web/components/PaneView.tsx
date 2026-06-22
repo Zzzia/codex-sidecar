@@ -159,16 +159,16 @@ export function PaneView(props: PaneViewProps) {
         <div className="pane-actions">
           <ContextUsageBadge usage={thread?.contextWindowUsage} />
           {props.pinned ? (
-            <div className="pane-pin-badge" title="已固定在主面板">
+            <div className="pane-pin-badge" title="Pinned to main area">
               <Pin size={12} />
-              <span>固定</span>
+              <span>Pinned</span>
             </div>
           ) : null}
           <div className="pane-menu-wrap" ref={menuRef}>
             <button
               className="icon-button"
-              title="更多操作"
-              aria-label="更多操作"
+              title="More actions"
+              aria-label="More actions"
               aria-expanded={menuOpen}
               onClick={(event) => {
                 event.stopPropagation();
@@ -187,7 +187,7 @@ export function PaneView(props: PaneViewProps) {
                   }}
                 >
                   <ChevronsUpDown size={14} />
-                  <span>切换横竖分屏</span>
+                  <span>Toggle split orientation</span>
                 </button>
                 <button
                   role="menuitem"
@@ -197,7 +197,7 @@ export function PaneView(props: PaneViewProps) {
                   }}
                 >
                   <ArrowLeftRight size={14} />
-                  <span>和相邻分屏换位</span>
+                  <span>Swap with adjacent pane</span>
                 </button>
                 <button
                   role="menuitem"
@@ -211,7 +211,7 @@ export function PaneView(props: PaneViewProps) {
                   ) : (
                     <Minimize2 size={14} />
                   )}
-                  <span>{props.collapsed ? "展开分屏" : "折叠分屏"}</span>
+                  <span>{props.collapsed ? "Expand pane" : "Collapse pane"}</span>
                 </button>
                 <button
                   role="menuitem"
@@ -225,7 +225,7 @@ export function PaneView(props: PaneViewProps) {
                   ) : (
                     <Maximize2 size={14} />
                   )}
-                  <span>{props.floating ? "退出浮窗" : "全屏浮窗"}</span>
+                  <span>{props.floating ? "Exit floating view" : "Open floating view"}</span>
                 </button>
                 {props.onTogglePin ? (
                   <button
@@ -236,13 +236,13 @@ export function PaneView(props: PaneViewProps) {
                     }}
                   >
                     {props.pinned ? <PinOff size={14} /> : <Pin size={14} />}
-                    <span>{props.pinned ? "取消固定" : "固定到主面板"}</span>
+                    <span>{props.pinned ? "Unpin" : "Pin to main area"}</span>
                   </button>
                 ) : null}
               </div>
             ) : null}
           </div>
-          <button className="icon-button danger" title="关闭分屏" onClick={props.onClose}>
+          <button className="icon-button danger" title="Close pane" onClick={props.onClose}>
             <X size={15} />
           </button>
         </div>
@@ -250,7 +250,7 @@ export function PaneView(props: PaneViewProps) {
 
       {!props.collapsed ? (
         <div className="pane-body">
-          {loading ? <div className="pane-placeholder">会话加载中…</div> : null}
+          {loading ? <div className="pane-placeholder">Loading session...</div> : null}
           {error ? <div className="pane-error">{error}</div> : null}
           {!loading && !error ? (
             <div className={`pane-content ${props.suspended ? "is-suspended" : ""}`}>
@@ -263,7 +263,7 @@ export function PaneView(props: PaneViewProps) {
             </div>
           ) : null}
           {props.suspended && !loading && !error ? (
-            <div className="pane-suspend-overlay">正在调整分栏布局…</div>
+            <div className="pane-suspend-overlay">Adjusting layout...</div>
           ) : null}
         </div>
       ) : null}

@@ -18,21 +18,21 @@ function formatBytes(size: number): string {
 
 function previewKindLabel(state: LocalFilePreviewState): string {
   if (state.status !== "ready") {
-    return state.status === "loading" ? "读取中" : "无法预览";
+    return state.status === "loading" ? "Loading" : "Preview unavailable";
   }
   if (state.preview.kind === "markdown") {
     return "Markdown";
   }
   if (state.preview.kind === "code") {
-    return "代码";
+    return "Code";
   }
   if (state.preview.kind === "image") {
-    return "图片";
+    return "Image";
   }
   if (state.preview.kind === "pdf") {
     return "PDF";
   }
-  return "不可预览";
+  return "Unsupported";
 }
 
 export function LocalFilePreviewModal({
@@ -54,13 +54,13 @@ export function LocalFilePreviewModal({
     state.status === "ready"
       ? `${previewKindLabel(state)} · ${formatBytes(state.preview.size)}`
       : state.status === "loading"
-        ? "正在读取本地文件"
-        : "无法预览";
+        ? "Reading local file"
+        : "Preview unavailable";
 
   return (
     <PreviewModalShell
-      ariaLabel="本地文件预览"
-      eyebrow="本地文件预览"
+      ariaLabel="Local file preview"
+      eyebrow="Local file preview"
       title={<h3 title={title}>{title}</h3>}
       titleText={title}
       meta={meta}
@@ -68,7 +68,7 @@ export function LocalFilePreviewModal({
       onClose={onClose}
     >
       {state.status === "loading" ? (
-        <div className="local-file-modal-empty">文件读取中…</div>
+        <div className="local-file-modal-empty">Reading file...</div>
       ) : null}
 
       {state.status === "error" ? (
@@ -77,7 +77,7 @@ export function LocalFilePreviewModal({
 
       {state.status === "ready" && state.preview.kind === "unsupported" ? (
         <div className="local-file-modal-empty">
-          {state.preview.reason ?? "这个文件类型暂不支持预览"}
+          {state.preview.reason ?? "This file type is not supported for preview"}
         </div>
       ) : null}
 
@@ -104,7 +104,7 @@ export function LocalFilePreviewModal({
             <img src={state.preview.dataUrl} alt={state.preview.displayPath} />
           </div>
         ) : (
-          <div className="local-file-modal-empty">图片内容为空，无法预览</div>
+          <div className="local-file-modal-empty">Image content is empty and cannot be previewed</div>
         )
       ) : null}
 
@@ -116,7 +116,7 @@ export function LocalFilePreviewModal({
             title={state.preview.displayPath}
           />
         ) : (
-          <div className="local-file-modal-empty">PDF 内容为空，无法预览</div>
+          <div className="local-file-modal-empty">PDF content is empty and cannot be previewed</div>
         )
       ) : null}
     </PreviewModalShell>

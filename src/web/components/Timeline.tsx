@@ -364,7 +364,7 @@ export function Timeline({
             <button
               className="timeline-jump-button"
               onClick={jumpToTop}
-              title="回到当前对话顶部"
+              title="Back to current turn top"
             >
               <ArrowUp size={15} />
             </button>
@@ -374,7 +374,7 @@ export function Timeline({
             <button
               className="timeline-jump-button"
               onClick={jumpToBottom}
-              title="回到底部并跟随"
+              title="Follow latest"
             >
               <ArrowDownToLine size={15} />
             </button>

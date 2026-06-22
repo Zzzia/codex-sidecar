@@ -323,7 +323,7 @@ export function pinAutoWorkspaceThreadToMain(
       const pinnedCount = next.pinnedThreadIds.length;
       return {
         ...next,
-        notice: `主面板已固定 ${pinnedCount} 个，请先关闭或取消固定一个会话`,
+        notice: `Main area already has ${pinnedCount} pinned sessions. Close or unpin one first.`,
       };
     }
     next = moveVisibleThreadToTray(next, evicted, lookup);

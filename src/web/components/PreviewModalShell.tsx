@@ -50,8 +50,8 @@ export function PreviewModalShell({
             <button
               type="button"
               className="icon-button"
-              title="关闭预览"
-              aria-label="关闭预览"
+              title="Close preview"
+              aria-label="Close preview"
               onClick={onClose}
             >
               <X size={15} />

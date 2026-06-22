@@ -278,7 +278,7 @@ test("buildTurnCards keeps start title when task_started status is missing", () 
 
   assert.equal(cards.length, 1);
   assert.equal(cards[0]?.status, "completed");
-  assert.equal(cards[0]?.statusTitle, "对话开始");
+  assert.equal(cards[0]?.statusTitle, "Turn started");
 });
 
 test("buildTurnCards renders assistant proposed plans but skips update_plan in timeline body", () => {

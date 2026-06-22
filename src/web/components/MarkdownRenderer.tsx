@@ -116,7 +116,7 @@ export function MarkdownRenderer({
       setFilePreviewState({
         status: "error",
         href,
-        message: "当前会话没有可用的工程目录，无法预览本地文件。",
+        message: "This session has no available working directory for local file previews.",
       });
       return;
     }
@@ -130,7 +130,7 @@ export function MarkdownRenderer({
         setFilePreviewState({
           status: "error",
           href,
-          message: error instanceof Error ? error.message : "文件预览失败",
+          message: error instanceof Error ? error.message : "File preview failed",
         });
       });
   };
@@ -243,7 +243,7 @@ export function MarkdownRenderer({
                 onClick={handleClick}
                 target={localFileLink ? undefined : "_blank"}
                 rel={localFileLink ? undefined : "noreferrer"}
-                title={localFileLink ? "点击预览本地文件" : rest.title}
+                title={localFileLink ? "Preview local file" : rest.title}
               />
             );
           },

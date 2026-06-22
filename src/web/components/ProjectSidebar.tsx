@@ -149,7 +149,7 @@ export function ProjectSidebar(props: ProjectSidebarProps) {
           <button
             className="icon-button"
             onClick={props.onToggleSidebar}
-            title={props.sidebarOpen ? "隐藏侧栏" : "固定侧栏"}
+            title={props.sidebarOpen ? "Hide sidebar" : "Pin sidebar"}
           >
             {props.sidebarOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
           </button>
@@ -159,8 +159,8 @@ export function ProjectSidebar(props: ProjectSidebarProps) {
           type="button"
           className="sidebar-collapsed-trigger"
           onClick={props.onToggleSidebar}
-          title="展开侧栏"
-          aria-label="展开侧栏"
+          title="Expand sidebar"
+          aria-label="Expand sidebar"
         >
           <ChevronRight size={15} />
         </button>
@@ -168,7 +168,7 @@ export function ProjectSidebar(props: ProjectSidebarProps) {
 
       {sidebarExpanded ? (
         <>
-          {props.loading ? <div className="sidebar-empty">工程列表加载中…</div> : null}
+          {props.loading ? <div className="sidebar-empty">Loading projects...</div> : null}
           {props.error ? <div className="sidebar-error">{props.error}</div> : null}
           <div className="sidebar-search-row">
             <label className="sidebar-search-box">
@@ -176,7 +176,7 @@ export function ProjectSidebar(props: ProjectSidebarProps) {
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="搜索项目 / 会话"
+                placeholder="Search projects / sessions"
               />
             </label>
             <button
@@ -184,18 +184,18 @@ export function ProjectSidebar(props: ProjectSidebarProps) {
                 activeProjectsOnly ? "is-active" : ""
               }`}
               onClick={() => setActiveProjectsOnly((current) => !current)}
-              title={activeProjectsOnly ? "显示所有项目" : "只看活跃项目"}
-              aria-label={activeProjectsOnly ? "显示所有项目" : "只看活跃项目"}
+              title={activeProjectsOnly ? "Show all projects" : "Active projects only"}
+              aria-label={activeProjectsOnly ? "Show all projects" : "Active projects only"}
             >
               <Activity size={14} />
             </button>
           </div>
           <div className="sidebar-content">
-            <section className="project-section" aria-label="项目">
-              <div className="sidebar-section-title">项目</div>
+            <section className="project-section" aria-label="Projects">
+              <div className="sidebar-section-title">Projects</div>
               <div className="project-list">
                 {filteredProjects.length === 0 ? (
-                  <div className="sidebar-empty inline">没有匹配的项目</div>
+                  <div className="sidebar-empty inline">No matching projects</div>
                 ) : (
                   filteredProjects.map((project) => (
                     <div
@@ -225,10 +225,10 @@ export function ProjectSidebar(props: ProjectSidebarProps) {
                                 }}
                                 title={
                                   copiedKey === `project:${project.cwd}`
-                                    ? "已复制工程路径"
-                                    : "复制工程路径"
+                                    ? "Project path copied"
+                                    : "Copy project path"
                                 }
-                                aria-label="复制工程路径"
+                                aria-label="Copy project path"
                               >
                                 {copiedKey === `project:${project.cwd}` ? (
                                   <Check size={12} />
@@ -241,8 +241,8 @@ export function ProjectSidebar(props: ProjectSidebarProps) {
                         </div>
                       </div>
                       <div className="project-stats">
-                        <span>{project.activeThreadCount} 活跃</span>
-                        <span>{project.totalThreadCount} 会话</span>
+                        <span>{project.activeThreadCount} active</span>
+                        <span>{project.totalThreadCount} sessions</span>
                         <span className="project-updated">
                           <Clock3 size={12} />
                           {timeLabel(project.latestUpdatedAt)}
@@ -254,9 +254,9 @@ export function ProjectSidebar(props: ProjectSidebarProps) {
               </div>
             </section>
 
-            <section className="thread-section" aria-label="会话">
+            <section className="thread-section" aria-label="Sessions">
               <div className="sidebar-section-title">
-                <span>会话</span>
+                <span>Sessions</span>
                 <div className="thread-section-tools">
                   {selectedProject ? (
                     <span title={selectedProject.displayName}>
@@ -265,8 +265,8 @@ export function ProjectSidebar(props: ProjectSidebarProps) {
                   ) : null}
                   <button
                     className="thread-section-menu"
-                    title="会话排序和更多操作"
-                    aria-label="会话排序和更多操作"
+                    title="Session sorting and more actions"
+                    aria-label="Session sorting and more actions"
                   >
                     <MoreVertical size={13} />
                   </button>
@@ -274,9 +274,9 @@ export function ProjectSidebar(props: ProjectSidebarProps) {
               </div>
               <div className="thread-list">
                 {!selectedProject ? (
-                  <div className="thread-empty">请选择一个项目</div>
+                  <div className="thread-empty">Select a project</div>
                 ) : selectedThreads.length === 0 ? (
-                  <div className="thread-empty">当前筛选下没有会话</div>
+                  <div className="thread-empty">No sessions match the current filter</div>
                 ) : (
                   selectedThreads.map((thread) => (
                     <div
@@ -306,10 +306,10 @@ export function ProjectSidebar(props: ProjectSidebarProps) {
                             }}
                             title={
                               copiedKey === `thread:${thread.id}`
-                                ? "已复制会话标题"
-                                : "复制会话标题"
+                                ? "Session title copied"
+                                : "Copy session title"
                             }
-                            aria-label="复制会话标题"
+                            aria-label="Copy session title"
                           >
                             {copiedKey === `thread:${thread.id}` ? (
                               <Check size={12} />
@@ -339,8 +339,8 @@ export function ProjectSidebar(props: ProjectSidebarProps) {
                   }}
                 >
                   {loadingAllCwd === selectedProject?.cwd
-                    ? "正在加载全部会话…"
-                    : `查看全部会话（${selectedProject?.totalThreadCount ?? 0}）`}
+                    ? "Loading all sessions..."
+                    : `Show all sessions (${selectedProject?.totalThreadCount ?? 0})`}
                 </button>
               ) : null}
             </section>

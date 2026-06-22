@@ -29,9 +29,9 @@ function statusLabel(status: ThreadStatus, title: string): string {
     return title;
   }
   if (status === "error") {
-    return "执行异常";
+    return "Execution error";
   }
-  return "对话开始";
+  return "Turn started";
 }
 
 function formatTurnDuration(startedAt: string, updatedAt: string): string {
@@ -43,7 +43,7 @@ function formatTurnDuration(startedAt: string, updatedAt: string): string {
 
   const totalSeconds = Math.max(0, Math.round((updatedMs - startedMs) / 1000));
   if (totalSeconds <= 0) {
-    return "少于 1 秒";
+    return "Less than 1s";
   }
 
   const hours = Math.floor(totalSeconds / 3600);
@@ -52,15 +52,15 @@ function formatTurnDuration(startedAt: string, updatedAt: string): string {
 
   if (hours > 0) {
     return seconds > 0
-      ? `${hours} 小时 ${minutes} 分 ${seconds} 秒`
-      : `${hours} 小时 ${minutes} 分`;
+      ? `${hours} h ${minutes} min ${seconds} s`
+      : `${hours} h ${minutes} min`;
   }
 
   if (minutes > 0) {
-    return seconds > 0 ? `${minutes} 分 ${seconds} 秒` : `${minutes} 分`;
+    return seconds > 0 ? `${minutes} min ${seconds} s` : `${minutes} min`;
   }
 
-  return `${seconds} 秒`;
+  return `${seconds} s`;
 }
 
 function TurnCardFooter({
@@ -74,7 +74,7 @@ function TurnCardFooter({
 }) {
   if (status === "running") {
     return (
-      <footer className="turn-card-footer is-running" aria-label="对话进行中">
+      <footer className="turn-card-footer is-running" aria-label="Turn in progress">
         <span className="turn-card-loading" aria-hidden="true">
           ……
         </span>
@@ -88,12 +88,12 @@ function TurnCardFooter({
   }
 
   const statusText =
-    status === "error" ? "异常结束" : status === "completed" ? "已结束" : "待机";
+    status === "error" ? "Ended with error" : status === "completed" ? "Completed" : "Idle";
 
   return (
     <footer className={`turn-card-footer ${status === "error" ? "is-error" : ""}`}>
       <span className="turn-card-metrics">
-        {`${statusText} · 用时 ${duration}`}
+        {`${statusText} · Duration ${duration}`}
       </span>
     </footer>
   );

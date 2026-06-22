@@ -45,7 +45,7 @@ test("explorationMeta prefers command count for grouped exploration", () => {
     tools: [createTool(), createTool({ id: "tool-2", callId: "call-2" })],
   };
 
-  assert.equal(explorationMeta(step), "2 条命令");
+  assert.equal(explorationMeta(step), "2 commands");
 });
 
 test("explorationMeta keeps running hint for a single active step", () => {
@@ -57,7 +57,7 @@ test("explorationMeta keeps running hint for a single active step", () => {
     tools: [createTool()],
   };
 
-  assert.equal(explorationMeta(step), "执行中");
+  assert.equal(explorationMeta(step), "Running");
 });
 
 test("shouldShowPatchBackTop only reacts to diff content taller than viewport", () => {

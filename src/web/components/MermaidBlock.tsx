@@ -147,7 +147,7 @@ export function MermaidBlock({ chart }: { chart: string }) {
         if (active) {
           setSvg("");
           setError(
-            renderError instanceof Error ? renderError.message : "Mermaid 渲染失败",
+            renderError instanceof Error ? renderError.message : "Mermaid render failed",
           );
         }
       });
@@ -168,7 +168,7 @@ export function MermaidBlock({ chart }: { chart: string }) {
   if (!svg) {
     return (
       <div className="mermaid-block is-loading" aria-busy="true">
-        Mermaid 渲染中…
+        Rendering Mermaid...
       </div>
     );
   }
@@ -179,8 +179,8 @@ export function MermaidBlock({ chart }: { chart: string }) {
         <button
           type="button"
           className="mermaid-fullscreen-button"
-          title="全屏预览 Mermaid"
-          aria-label="全屏预览 Mermaid"
+          title="Preview Mermaid fullscreen"
+          aria-label="Preview Mermaid fullscreen"
           onClick={() => setPreviewOpen(true)}
         >
           <Maximize2 size={14} />
@@ -210,14 +210,14 @@ function MermaidPreviewModal({
         className="mermaid-preview-modal"
         role="dialog"
         aria-modal="true"
-        aria-label="Mermaid 全屏预览"
+        aria-label="Mermaid fullscreen preview"
         onClick={(event) => event.stopPropagation()}
       >
         <button
           type="button"
           className="mermaid-preview-close"
-          title="关闭"
-          aria-label="关闭 Mermaid 预览"
+          title="Close"
+          aria-label="Close Mermaid preview"
           onClick={onClose}
         >
           <X size={16} />

@@ -16,12 +16,12 @@ function tryParseJson(text: string): Record<string, unknown> | null {
 function patchPreview(patchText: string): string {
   const matches = [...patchText.matchAll(/\*\*\* (?:Add|Update|Delete) File: (.+)/g)];
   if (matches.length === 0) {
-    return "查看补丁";
+    return "View patch";
   }
   if (matches.length === 1) {
-    return matches[0]?.[1] ?? "查看补丁";
+    return matches[0]?.[1] ?? "View patch";
   }
-  return `${matches[0]?.[1] ?? "补丁"} 等 ${matches.length} 个文件`;
+  return `${matches[0]?.[1] ?? "patch"} and ${matches.length} files`;
 }
 
 export function commandTextFromResult(result: ToolResultPayload): string {

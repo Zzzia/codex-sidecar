@@ -238,9 +238,9 @@ export function WorkspaceView(props: WorkspaceViewProps) {
     return (
       <section className="workspace-empty">
         <div className="workspace-empty-eyebrow">Codex App</div>
-        <h2>从左侧打开一个会话</h2>
+        <h2>Open a session from the left sidebar</h2>
         <p>
-          这里会以多分屏方式并排展示不同工程的 Codex 会话，支持折叠、换位和横竖切分。
+          Codex sessions from different projects appear here as panes, with collapse, swap, and split-orientation controls.
         </p>
       </section>
     );
@@ -254,7 +254,7 @@ export function WorkspaceView(props: WorkspaceViewProps) {
           className={`workspace-floating-backdrop ${
             closingFloatingLeafId ? "is-closing" : ""
           }`}
-          aria-label="退出浮窗"
+          aria-label="Exit floating view"
           onClick={closeFloating}
         />
       ) : null}

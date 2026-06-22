@@ -1,58 +1,82 @@
 # Codex Sidecar
 
-> A live companion UI for Codex CLI, with Markdown rendering and multi-project monitoring.
+> A lightweight companion UI for monitoring many Codex CLI coding sessions in real time.
 
-Codex Sidecar 是一个围绕 **本地 Codex CLI** 的伴随式 Web UI。你继续在终端里使用原生 Codex CLI，Sidecar 负责读取本机会话状态和 rollout 日志，把 Codex 输出实时渲染成更适合阅读、回看和并行监看的界面。
+[Chinese](./README.zh-CN.md)
 
-它不是重新包装一套 CLI，也不要求你换掉原来的工作流。它做的事情更克制：**保留原生 CLI 体验，只补上 Markdown 预览、多工程切换、工具调用聚合和代码修改可视化。**
+Codex Sidecar is built for developers who like the directness of **Codex CLI** but do not want to lose visibility when several AI coding tasks are running across different projects.
 
-![Codex Sidecar parallel monitoring](./imgs/screenshot-20260511-201616.webp)
+The full Codex app can feel heavier than needed if your main workflow already lives in the terminal. Codex CLI stays fast and familiar, but terminal tabs make it hard to answer simple operational questions: which project is still running, which turn needs review, where did the patch land, and what changed while you were looking elsewhere.
 
-上图是多个 Codex CLI 会话并行工作时的监看场景：左侧按项目聚合最近会话，右侧可以同时打开多个会话面板，实时查看正文输出、工具调用、patch 和进度状态。
+Codex Sidecar keeps the CLI as the source of truth and adds a browser-based monitoring workspace next to it. It reads local Codex state and rollout logs, then renders each session as a live timeline with Markdown, tool calls, patches, progress, and multi-project context.
 
-## 为什么做这个项目
+![Codex Sidecar Markdown and Mermaid rendering](./imgs/image-multi-render.png)
 
-Codex CLI 在终端里很好用，但有两个天然痛点：
+The screenshot shows the intended use case: several Codex CLI sessions running in parallel, grouped by project, with rich Markdown and Mermaid rendering inside the browser workspace.
 
-- 输出是 Markdown / 富结构内容，在纯 TUI 中阅读成本高。
-- 多个项目同时跑时，需要来回切终端 tab 查看进度和交互。
+## Why This Exists
 
-Codex Sidecar 的目标就是解决这两个问题：把正文、工具调用、patch、进度分开展示，同时保持同一轮对话的上下文连续性；把多个工程和多个会话集中到一个工作区里切换、分屏和监看。
+Codex CLI is a good place to drive coding work, but it has two practical limits during parallel work:
 
-## 当前能力
+- Rich Markdown, tool calls, and patches are harder to scan in a terminal-only interface.
+- Multiple projects running at once require constant terminal tab switching to understand status.
 
-- **原生 CLI 伴随模式**：不接管 Codex CLI 调用链，只读取本地状态并做 UI 增强。
-- **实时会话监看**：读取本机 Codex 会话并流式更新，SSE 中断后也会用增量同步恢复状态。
-- **Markdown 阅读增强**：正文支持 Markdown、表格、代码块、Mermaid 和本地文件预览。
-- **工具调用降噪**：按语义展示工具调用，`Search / Read / List` 会聚合成探索块。
-- **代码修改可视化**：patch 独立展示，支持 diff 预览、展开 / 收起和大 diff 快速回到顶部。
-- **进度独立展示**：`update_plan` 渲染到底部进度栏，而不是混入正文噪音。
-- **多工程与多会话**：左侧支持项目聚合、会话切换和活跃项目过滤。
-- **并行工作区**：支持多线程分屏、折叠、换位、横竖切分，适合同时观察多个 Codex 任务。
+Codex Sidecar fills that visibility gap without replacing your CLI workflow. You keep launching and interacting with Codex in the terminal, while the web UI gives you a readable control room for monitoring ongoing and finished sessions.
 
-本地启动：
+## Features
+
+- **Native CLI sidecar mode**: does not call or wrap Codex CLI; it only observes local state and logs.
+- **Live session monitoring**: streams local Codex session updates and recovers with incremental sync after SSE interruptions.
+- **Markdown and Mermaid rendering**: renders Markdown, tables, code blocks, Mermaid diagrams, and local file previews.
+- **Tool-call noise reduction**: groups semantic exploration commands such as search, read, and list operations.
+- **Patch visibility**: shows patches as first-class timeline blocks with diff previews and expand/collapse behavior.
+- **Separate progress area**: renders `update_plan` in the bottom progress bar instead of mixing it into the main response.
+- **Fast turn navigation**: jumps back to the current turn top in long timelines without manual scrolling.
+- **Multi-project awareness**: groups sessions by working directory and highlights active projects.
+- **Parallel workspace**: supports multiple panes, pinning, archiving, swapping, collapsing, and horizontal/vertical splits.
+
+## Quick Start
 
 ```bash
+git clone https://github.com/Zzzia/codex-sidecar.git
+cd codex-sidecar
 pnpm install
 pnpm dev
 ```
 
-默认访问地址：
+Default local URLs:
 
 - Web UI: `http://127.0.0.1:4316`
 - API: `http://127.0.0.1:4315`
 
-## 设计原则
+## Design Principles
 
-- 终端仍是主操作面，GUI 是伴随观察层。
-- 正文优先可读，工具调用优先降噪。
-- patch 是高优先级信息，不与普通工具输出混排。
-- 多工程 / 多会话切换要比“炫技式 UI”更重要。
-- 体验尽量贴近原生 Codex，而不是重新定义一套交互语义。
+- The terminal remains the primary interaction surface; the browser is an observation layer.
+- Readability of assistant output comes before visual decoration.
+- Tool calls should be compressed into useful signals instead of becoming timeline noise.
+- Patches are high-priority artifacts and should not be buried inside generic tool output.
+- Multi-project and multi-session switching matters more than a flashy chat UI.
+- The product should stay close to native Codex semantics instead of inventing a second workflow.
 
-## 开发说明
+## How It Works
 
-如果你准备继续改这个项目，建议先读：
+```mermaid
+flowchart LR
+    A["~/.codex/state_5.sqlite"] --> B["CodexObserver"]
+    C["thread rollout.jsonl"] --> D["ThreadRuntime"]
+    B --> D
+    D --> E["normalize.ts"]
+    E --> F["shared timeline events"]
+    F --> G["HTTP snapshot API"]
+    F --> H["SSE stream API"]
+    G --> I["useThreadFeed"]
+    H --> I
+    I --> J["Timeline / PaneProgress / WorkspaceView"]
+```
+
+## Development Notes
+
+If you plan to change the project, start with these files:
 
 - `AGENTS.md`
 - `src/server/observer/normalize.ts`
@@ -61,4 +85,4 @@ pnpm dev
 - `src/web/components/Timeline.tsx`
 - `src/web/state/workspace.ts`
 
-这些文件基本覆盖了事件采集、时间线聚合、状态恢复和多会话工作区的核心设计。
+They cover the core event ingestion, timeline grouping, stream recovery, and multi-session workspace behavior.

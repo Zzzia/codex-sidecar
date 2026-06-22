@@ -206,7 +206,7 @@ test("pinning is rejected when the main panel is full of pinned panes", () => {
   const next = pinAutoWorkspaceThreadToMain(state, "thread-1", threads, 2);
 
   assert.deepEqual(next.visiblePaneThreadIds.sort(), ["thread-2", "thread-3"]);
-  assert.match(next.notice ?? "", /主面板已固定 2 个/);
+  assert.match(next.notice ?? "", /2 pinned sessions/);
 });
 
 test("unpinning over-limit panes allows automatic trimming", () => {

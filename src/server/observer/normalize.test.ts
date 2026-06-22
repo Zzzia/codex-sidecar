@@ -593,7 +593,7 @@ test("normalizeRecord marks context_compacted as completion", () => {
     assert.fail("expected compaction event");
   }
   assert.equal(events[0].state, "completed");
-  assert.equal(events[0].title, "上下文压缩完成");
+  assert.equal(events[0].title, "Context compaction completed");
 });
 
 test("normalizeRecord treats turn_aborted as a terminal non-active status", () => {
@@ -622,7 +622,7 @@ test("normalizeRecord treats turn_aborted as a terminal non-active status", () =
     assert.fail("expected status event");
   }
   assert.equal(events[0].status, "completed");
-  assert.equal(events[0].title, "对话中断");
+  assert.equal(events[0].title, "Turn interrupted");
 });
 
 test("summarizeThreadText collapses whitespace and truncates long text", () => {

@@ -49,7 +49,7 @@ function loadSidebarOpen(): boolean {
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(`请求失败: ${response.status}`);
+    throw new Error(`Request failed: ${response.status}`);
   }
   return (await response.json()) as T;
 }
@@ -179,7 +179,7 @@ export default function App() {
       } catch (error) {
         if (!cancelled) {
           setSyncError(
-            error instanceof Error ? error.message : "活跃会话同步失败",
+            error instanceof Error ? error.message : "Failed to sync active sessions",
           );
         }
       }
@@ -222,7 +222,7 @@ export default function App() {
       } catch (error) {
         if (!cancelled) {
           setSyncError(
-            error instanceof Error ? error.message : "会话状态同步失败",
+            error instanceof Error ? error.message : "Failed to sync session status",
           );
         }
       }

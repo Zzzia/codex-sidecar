@@ -11,7 +11,7 @@ test("InlinePatchRun renders every patch file expanded by default", () => {
     id: "patch-1",
     ts: "2026-04-22T08:00:00.000Z",
     invocationText: "",
-    summary: "代码修改",
+    summary: "Code changes",
     success: true,
     changes: [
       {
@@ -43,7 +43,7 @@ test("InlinePatchRun shows file preview controls when file context is available"
     id: "patch-1",
     ts: "2026-04-22T08:00:00.000Z",
     invocationText: "",
-    summary: "代码修改",
+    summary: "Code changes",
     success: true,
     changes: [
       {
@@ -71,7 +71,7 @@ test("InlinePatchRun hides file preview controls for deleted files", () => {
     id: "patch-1",
     ts: "2026-04-22T08:00:00.000Z",
     invocationText: "",
-    summary: "代码修改",
+    summary: "Code changes",
     success: true,
     changes: [
       {
@@ -131,7 +131,7 @@ test("ToolDetailsModal renders command output text", () => {
     }),
   );
 
-  assert.match(markup, />工具输出</);
+  assert.match(markup, />Tool output</);
   assert.match(markup, /\/workspace\/demo/);
   assert.doesNotMatch(markup, /Chunk ID/);
 });
@@ -176,7 +176,7 @@ test("ToolDetailsModal renders running command state without fake output", () =>
     }),
   );
 
-  assert.match(markup, />执行状态</);
-  assert.match(markup, /后台运行中 · session 30947/);
-  assert.doesNotMatch(markup, />工具输出</);
+  assert.match(markup, />Execution state</);
+  assert.match(markup, /Running in background · session 30947/);
+  assert.doesNotMatch(markup, />Tool output</);
 });

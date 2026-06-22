@@ -17,7 +17,7 @@ test("MarkdownRenderer can render highlighted code blocks with line numbers", ()
   assert.match(markup, /data-line="2"/);
   assert.match(markup, /hljs-keyword/);
   assert.match(markup, /class="[^"]*copyable-code-block/);
-  assert.match(markup, /aria-label="复制代码块"/);
+  assert.match(markup, /aria-label="Copy code block"/);
 });
 
 test("MarkdownRenderer does not add copy controls to inline code", () => {
@@ -28,7 +28,7 @@ test("MarkdownRenderer does not add copy controls to inline code", () => {
   );
 
   assert.doesNotMatch(markup, /copyable-code-block/);
-  assert.doesNotMatch(markup, /aria-label="复制代码块"/);
+  assert.doesNotMatch(markup, /aria-label="Copy code block"/);
 });
 
 test("MarkdownRenderer keeps mermaid-labeled snippets as code blocks", () => {
@@ -40,5 +40,5 @@ test("MarkdownRenderer keeps mermaid-labeled snippets as code blocks", () => {
 
   assert.match(markup, /copyable-code-block/);
   assert.match(markup, /BFF \/conversations\/\{id\}\/turn/);
-  assert.doesNotMatch(markup, /Mermaid 渲染中/);
+  assert.doesNotMatch(markup, /Rendering Mermaid/);
 });

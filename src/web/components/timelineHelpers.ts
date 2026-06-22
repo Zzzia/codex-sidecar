@@ -20,20 +20,20 @@ export function summarizeExplorationStep(step: ExplorationStepView): string {
     if (step.query && step.path) {
       return `${step.query} · ${step.path}`;
     }
-    return step.query ?? step.path ?? "搜索";
+    return step.query ?? step.path ?? "Search";
   }
 
-  return step.path ?? "当前目录";
+  return step.path ?? "current directory";
 }
 
 export function explorationLabel(step: ExplorationStepView): string {
   if (step.kind === "read") {
-    return "读取";
+    return "Read";
   }
   if (step.kind === "search") {
-    return "搜索";
+    return "Search";
   }
-  return "列目录";
+  return "List";
 }
 
 export function toolRunState(tool: ToolRunView): "running" | "error" | "success" | "idle" {
@@ -70,10 +70,10 @@ export function explorationState(
 
 export function explorationMeta(step: ExplorationStepView): string {
   if (step.tools.length > 1) {
-    return `${step.tools.length} 条命令`;
+    return `${step.tools.length} commands`;
   }
 
-  return explorationState(step) === "running" ? "执行中" : "";
+  return explorationState(step) === "running" ? "Running" : "";
 }
 
 export function shouldShowPatchBackTop(

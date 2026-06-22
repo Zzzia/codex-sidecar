@@ -35,11 +35,11 @@ function toolBadgeText(tool: ToolRunView): string {
   }
 
   if (tool.result?.success === false) {
-    return tool.result.exitCode != null ? `exit ${tool.result.exitCode}` : "异常";
+    return tool.result.exitCode != null ? `exit ${tool.result.exitCode}` : "Error";
   }
 
   if (tool.status === "failed") {
-    return "异常";
+    return "Error";
   }
 
   if (tool.result?.exitCode != null && tool.result.exitCode !== 0) {
@@ -51,7 +51,7 @@ function toolBadgeText(tool: ToolRunView): string {
   }
 
   if (tool.name === "exec_command" && tool.result?.processId) {
-    return "运行中";
+    return "Running";
   }
 
   return tool.status === "completed" ? "" : tool.status ?? "";
@@ -78,7 +78,7 @@ export function ToolRunList({
             key={tool.id}
             className={`tool-run-row ${hasError ? "is-error" : hasSuccess ? "is-success" : ""}`}
             onClick={() => onInspect(tool)}
-            title={`${tool.preview}\n点击查看详情`}
+            title={`${tool.preview}\nClick to view details`}
           >
             <span className="tool-run-icon">
               {hasError ? <CircleAlert size={14} /> : <TerminalSquare size={14} />}
@@ -90,7 +90,7 @@ export function ToolRunList({
               </code>
             </span>
             {badgeText ? <span className="tool-run-badge">{badgeText}</span> : null}
-            <span className="tool-run-hint">查看详情</span>
+            <span className="tool-run-hint">Details</span>
           </button>
         );
       })}

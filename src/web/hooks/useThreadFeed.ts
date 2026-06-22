@@ -127,7 +127,7 @@ export function useThreadFeed(
           `/api/threads/${threadId}/events?after=${cursorRef.current}`,
         );
         if (!response.ok) {
-          throw new Error(`增量事件加载失败: ${response.status}`);
+          throw new Error(`Failed to load incremental events: ${response.status}`);
         }
         const delta = (await response.json()) as ThreadDelta;
         if (!disposed) {
@@ -137,7 +137,7 @@ export function useThreadFeed(
         if (!disposed) {
           setState((current) => ({
             ...current,
-            error: error instanceof Error ? error.message : "增量事件加载失败",
+            error: error instanceof Error ? error.message : "Failed to load incremental events",
           }));
         }
       } finally {
@@ -157,7 +157,7 @@ export function useThreadFeed(
 
           const response = await fetch(`/api/threads/${threadId}/snapshot`);
           if (!response.ok) {
-            throw new Error(`会话快照加载失败: ${response.status}`);
+            throw new Error(`Failed to load session snapshot: ${response.status}`);
           }
           const snapshot = (await response.json()) as ThreadSnapshot;
           if (disposed) {
@@ -221,7 +221,7 @@ export function useThreadFeed(
           if (!disposed) {
             setState((current) => ({
               ...current,
-              error: "事件流连接中断，正在使用增量同步恢复",
+              error: "Event stream disconnected; recovering with incremental sync",
             }));
             void refreshDelta();
           }
@@ -238,7 +238,7 @@ export function useThreadFeed(
             cursor: 0,
             loading: false,
             error:
-              error instanceof Error ? error.message : "会话数据加载失败",
+              error instanceof Error ? error.message : "Failed to load session data",
           });
         }
       }

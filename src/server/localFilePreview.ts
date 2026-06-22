@@ -235,7 +235,7 @@ export async function previewLocalFile(
       displayPath,
       kind,
       size: fileStat.size,
-      reason: "这个文件类型暂不支持预览",
+      reason: "This file type is not supported for preview",
     };
   }
   if (fileStat.size > maxBytesForKind(kind)) {

@@ -38,7 +38,7 @@ interface MutableTurn {
   patchMap: Map<string, PatchRunView>;
 }
 
-const DEFAULT_TURN_TITLE = "对话开始";
+const DEFAULT_TURN_TITLE = "Turn started";
 
 function createTurn(
   idSeed: string,
@@ -250,7 +250,7 @@ function ensurePatchRun(
     id: callId || `${fallback.ts ?? turn.updatedAt}:patch`,
     ts: fallback.ts ?? turn.updatedAt,
     invocationText: fallback.invocationText ?? "",
-    summary: fallback.summary ?? "代码修改",
+    summary: fallback.summary ?? "Code changes",
     success: fallback.success ?? true,
     changes: fallback.changes ?? [],
   };
@@ -522,7 +522,7 @@ export function buildTurnCards(events: TimelineEvent[]): TurnCardView[] {
         };
       } else {
         current.status = event.status;
-        if (!current.statusTitle || current.statusTitle === "对话中" || current.statusTitle === "待机") {
+        if (!current.statusTitle || current.statusTitle === "In progress" || current.statusTitle === "Idle") {
           current.statusTitle = event.title;
         }
         current.updatedAt = event.ts;

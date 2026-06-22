@@ -1,55 +1,55 @@
 # AGENTS.md
 
-本文件面向在本仓库内工作的代理、贡献者和维护者，目标是两件事：
+This file is for agents, contributors, and maintainers working in this repository. It has two goals:
 
-1. 快速理解工程结构和真实数据流。
-2. 在继续演进 UI / 事件归一化 / 多会话工作区时，保持关键行为稳定，不把产品重新做成一个“二次封装的 Codex CLI”。
+1. Help readers quickly understand the project structure and real data flow.
+2. Keep key behavior stable while evolving the UI, event normalization, and multi-session workspace, without turning the product into a second wrapper around Codex CLI.
 
-## 项目定位
+## Project Positioning
 
-`codex-sidecar` 是一个 **面向本地 Codex CLI 的伴随式 GUI**。
+`codex-sidecar` is a **companion GUI for local Codex CLI sessions**.
 
-它当前的核心思路不是“在 GUI 中重写一套 Codex 调用链”，而是：
+Its core model is not "rebuild Codex invocation inside the GUI". Instead:
 
-- 用户继续在终端里使用原生 Codex CLI
-- 服务端读取本机 Codex 状态库与 rollout 日志
-- 前端把事件流渲染成更适合阅读和多工程切换的工作台
+- Users continue to use native Codex CLI in the terminal.
+- The server reads local Codex state and rollout logs.
+- The frontend renders the event stream into a more readable workspace for review and multi-project monitoring.
 
-这条约束非常重要。除非有明确的新设计，否则不要把主链路改造成“GUI 主导调用 Codex”。
+This constraint is important. Unless a new design explicitly says otherwise, do not change the main path into a GUI-driven Codex caller.
 
-## 快速入口
+## Quick Entry Points
 
-首次进入代码库时，优先读下面这些文件：
+When entering the codebase for the first time, read these files first:
 
 - `src/server/index.ts`
-  - HTTP API 和 SSE 入口
-  - 生产环境静态资源入口
+  - HTTP API and SSE entry points
+  - Production static asset serving
 - `src/server/observer/CodexObserver.ts`
-  - 项目 / 线程聚合
-  - `ThreadRuntime` 生命周期管理
+  - Project and thread aggregation
+  - `ThreadRuntime` lifecycle management
 - `src/server/observer/ThreadRuntime.ts`
-  - rollout 日志 tail
-  - 增量事件推送
+  - Rollout log tailing
+  - Incremental event delivery
 - `src/server/observer/normalize.ts`
-  - 把原始 Codex 记录归一化成共享时间线事件
+  - Normalizes raw Codex records into shared timeline events
 - `src/shared/types.ts`
-  - 前后端共用的事件协议
+  - Shared frontend/backend event protocol
 - `src/web/hooks/useThreadFeed.ts`
-  - 快照加载 + SSE 订阅
+  - Snapshot loading and SSE subscription
 - `src/web/lib/turns.ts`
-  - 时间线“按回合分组”的核心逻辑
+  - Core logic for grouping timeline events by turn
 - `src/web/lib/progress.ts`
-  - `update_plan` / assistant plan 转底部进度区
+  - Converts `update_plan` and assistant plans into the bottom progress area
 - `src/web/components/Timeline.tsx`
-  - 时间线主体渲染
+  - Main timeline rendering
 - `src/web/components/TimelineInspectors.tsx`
-  - 工具详情弹窗 / patch 展示
+  - Tool detail modal and patch display
 - `src/web/state/workspace.ts`
-  - 多分屏工作区的数据结构与持久化
+  - Multi-pane workspace data model and persistence
 - `docs/auto-workspace.md`
-  - 自动主面板、底部任务托盘和容量设置规则
+  - Auto main pane, bottom task tray, and capacity rules
 
-## 当前真实数据流
+## Real Data Flow
 
 ```mermaid
 flowchart LR
@@ -65,157 +65,157 @@ flowchart LR
     I --> J["Timeline / PaneProgress / WorkspaceView"]
 ```
 
-### 数据来源
+### Data Sources
 
-- SQLite 数据库默认路径：`~/.codex/state_5.sqlite`
-- 单线程事件来源：每条线程记录中的 `rollout_path`
-- 服务端不会主动发起 Codex CLI 调用；当前职责是读取、归一化、推送
+- Default SQLite database path: `~/.codex/state_5.sqlite`
+- Per-thread event source: the `rollout_path` stored in each thread record
+- The server does not start Codex CLI calls. Its current job is reading, normalizing, and streaming.
 
-### 前端消费方式
+### Frontend Consumption
 
-- 首次进入线程：`/api/threads/:id/snapshot`
-- 增量更新：`/api/threads/:id/stream`
-- 项目列表：`/api/projects`
-- 某工程下线程分页：`/api/threads?cwd=...`
+- Initial thread load: `/api/threads/:id/snapshot`
+- Incremental updates: `/api/threads/:id/stream`
+- Project list: `/api/projects`
+- Threads under a project: `/api/threads?cwd=...`
 
-## 代码结构概览
+## Code Structure
 
-### 服务端
+### Server
 
 - `src/server/index.ts`
-  - 提供 REST + SSE 接口
-  - 生产环境托管 `dist/`
+  - REST and SSE endpoints
+  - Production `dist/` hosting
 - `src/server/observer/sqliteClient.ts`
-  - 读取 Codex 本地 SQLite 线程元数据
+  - Reads local Codex SQLite thread metadata
 - `src/server/observer/CodexObserver.ts`
-  - 缓存 `ThreadRuntime`
-  - 聚合项目列表 / 线程页
+  - Caches `ThreadRuntime`
+  - Aggregates project lists and thread pages
 - `src/server/observer/ThreadRuntime.ts`
-  - 增量读取 rollout JSONL
-  - 保持事件数组和订阅者
+  - Incrementally reads rollout JSONL
+  - Keeps event arrays and subscribers
 - `src/server/observer/normalize.ts`
-  - 识别 message / tool / patch / status / metric
-  - 这里的变更最容易引发前后端联动回归
+  - Detects message, tool, patch, status, and metric events
+  - Changes here are the most likely to cause frontend/backend regressions
 
-### 共享层
+### Shared Layer
 
 - `src/shared/types.ts`
-  - 共享事件协议、线程摘要、分页结构
-  - 修改这里通常意味着服务端和前端都要同步调整
+  - Shared event protocol, thread summaries, and pagination types
+  - Changes here usually require both server and frontend updates
 
-### 前端
+### Frontend
 
 - `src/web/hooks`
-  - `useProjects.ts`：项目列表轮询
-  - `useThreadFeed.ts`：线程快照 + SSE
+  - `useProjects.ts`: project list polling
+  - `useThreadFeed.ts`: thread snapshot and SSE feed
 - `src/web/state/workspace.ts`
-  - 工作区树结构
-  - 多分屏、折叠、换位、方向切换、localStorage 持久化
+  - Workspace tree structure
+  - Multi-pane split, collapse, swap, orientation, and localStorage persistence
 - `src/web/lib`
-  - `turns.ts`：把原始事件聚合成“单回合卡片”
-  - `progress.ts`：底部进度提取
-  - `commandSemantics.ts`：解析 `exec_command` 的命令语义
-  - `toolPresentation.ts`：工具预览文案
-  - `diffViewData.ts`：patch diff 预处理
+  - `turns.ts`: groups raw events into single-turn cards
+  - `progress.ts`: bottom progress extraction
+  - `commandSemantics.ts`: parses `exec_command` command semantics
+  - `toolPresentation.ts`: tool preview labels
+  - `diffViewData.ts`: patch diff preprocessing
 - `src/web/components`
-  - `ProjectSidebar.tsx`：工程与线程侧栏
-  - `WorkspaceView.tsx`：多分屏容器
-  - `PaneView.tsx`：单线程面板
-  - `Timeline.tsx`：时间线渲染
-  - `TimelineInspectors.tsx`：工具详情与 patch 展开区
-  - `PaneProgress.tsx`：底部进度栏
+  - `ProjectSidebar.tsx`: project and thread sidebar
+  - `WorkspaceView.tsx`: multi-pane container
+  - `PaneView.tsx`: single thread pane
+  - `Timeline.tsx`: timeline rendering
+  - `TimelineInspectors.tsx`: tool detail and patch expansion UI
+  - `PaneProgress.tsx`: bottom progress bar
 
-## 必须保持的产品约束
+## Product Constraints
 
-下面这些行为已经是当前产品语义的一部分，改动前请先理解原因。
+These behaviors are part of the current product semantics. Understand why they exist before changing them.
 
-### 1. 保持“原生 CLI + Sidecar 旁路观察”的模式
+### 1. Keep The Native CLI + Sidecar Observer Model
 
-- 不要默认把项目改成“GUI 内部直接调用 Codex”
-- 如果以后需要支持 GUI 主动发起会话，应当和当前 observer 模式解耦，而不是污染现有读取链路
+- Do not default the project into "the GUI calls Codex internally".
+- If GUI-initiated sessions are added later, keep them decoupled from the current observer path.
 
-### 2. 时间线是“按回合卡片分组”，不是“按 event 一张卡”
+### 2. The Timeline Is Grouped By Turn, Not One Card Per Event
 
-- 一个用户问题 + 本轮 assistant 输出 + 工具调用 + patch，应归于同一张回合卡
-- 相关实现入口在 `src/web/lib/turns.ts`
+- A user request, assistant output, tool calls, and patch should belong to the same turn card.
+- Relevant entry point: `src/web/lib/turns.ts`
 
-### 3. `update_plan` 不进入正文区
+### 3. `update_plan` Does Not Enter The Main Body
 
-- `update_plan` 进入底部进度区
-- Plan mode 的 assistant `<proposed_plan>` 展示为计划内容，不进入底部进度区
-- 相关实现入口在 `src/web/lib/progress.ts`
+- `update_plan` appears in the bottom progress area.
+- Plan mode assistant `<proposed_plan>` content is shown as plan content, not as bottom progress.
+- Relevant entry point: `src/web/lib/progress.ts`
 
-### 4. `write_stdin` 默认不在时间线中展示
+### 4. `write_stdin` Is Hidden From The Timeline By Default
 
-- 当前策略是直接过滤
-- 这属于刻意降噪，不是漏数据
+- The current strategy filters it directly.
+- This is intentional noise reduction, not missing data.
 
-### 5. 探索类命令要尽量聚合
+### 5. Exploration Commands Should Be Grouped
 
-- `Search + Read + Read` 这类事件不应退化成大量噪声卡片
-- `parsed_cmd` 的利用是现有体验的关键
-- 相关实现入口在 `src/web/lib/commandSemantics.ts` 与 `src/web/lib/turns.ts`
+- `Search + Read + Read` should not degrade into many noisy cards.
+- `parsed_cmd` is important to the current experience.
+- Relevant entry points: `src/web/lib/commandSemantics.ts` and `src/web/lib/turns.ts`
 
-### 6. patch 是独立重要信息，不应被普通工具块吞没
+### 6. Patches Are First-Class Information
 
-- patch 独立成专门 block
-- 默认展开，允许用户手动收起
-- diff 解析失败时要回退成原始文本，而不是渲染空壳
-- 相关实现入口在 `src/web/lib/diffViewData.ts` 与 `src/web/components/TimelineInspectors.tsx`
+- Patches are independent blocks.
+- They are expanded by default and can be collapsed manually.
+- If diff parsing fails, fall back to raw text instead of rendering an empty shell.
+- Relevant entry points: `src/web/lib/diffViewData.ts` and `src/web/components/TimelineInspectors.tsx`
 
-### 7. 不展示 token 用量
+### 7. Do Not Display Token Usage
 
-- 这已经是当前产品决策
-- 当前允许在分屏标题栏展示 `Context xx%` 这类上下文窗口占用率
-- 不要把 `token_count` 渲染进时间线，也不要把产品改成以 token / trace / 调试指标为中心的观测平台
+- This is a current product decision.
+- It is acceptable to show `Context xx%` style context-window usage in pane headers.
+- Do not render `token_count` in the timeline, and do not turn the product into a token, trace, or debug-metric observability platform.
 
-## 修改约束
+## Change Constraints
 
-### 事件协议相关
+### Event Protocol Changes
 
-如果修改以下任一位置：
+If you modify any of these files:
 
 - `src/server/observer/normalize.ts`
 - `src/shared/types.ts`
 - `src/web/lib/turns.ts`
 - `src/web/lib/progress.ts`
 
-请同步做三件事：
+Do all three:
 
-1. 检查前后端协议是否仍一致
-2. 更新相邻测试
-3. 用真实线程页面至少手动验证一次 UI
+1. Check that the frontend/backend protocol still matches.
+2. Update adjacent tests.
+3. Manually verify at least one real thread page in the UI.
 
-### UI 相关
+### UI Changes
 
-时间线 UI 修改时，优先维持以下优先级：
+For timeline UI changes, preserve this priority order:
 
-1. 正文可读性
-2. 工具噪音控制
-3. 代码修改可见性
-4. 多工程切换效率
+1. Main content readability
+2. Tool-call noise reduction
+3. Code-change visibility
+4. Multi-project switching efficiency
 
-不要为了视觉统一，把 patch、工具行、正文全部做成一套卡片样式。
+Do not flatten patches, tool rows, and assistant content into one generic card style just for visual consistency.
 
-### 工作区相关
+### Workspace Changes
 
-- 多分屏结构由 `workspace.ts` 维护
-- 尽量不要在组件层散落布局状态
-- 如果改动布局交互，注意 localStorage 兼容性
+- Multi-pane structure is owned by `workspace.ts`.
+- Avoid scattering layout state in components.
+- If layout interaction changes, keep localStorage compatibility in mind.
 
-## 开发命令
+## Development Commands
 
-### 本地开发
+### Local Development
 
 ```bash
 pnpm install
 pnpm dev
 ```
 
-- 前端开发端口：`4316`
-- 后端开发端口：`4315`
+- Frontend dev port: `4316`
+- Backend dev port: `4315`
 
-### 检查与构建
+### Checks And Build
 
 ```bash
 pnpm test
@@ -223,9 +223,9 @@ pnpm check
 pnpm build
 ```
 
-## 测试约定
+## Testing Conventions
 
-当前项目已经把关键纯逻辑拆到了可单测层。改动时优先补这些位置的测试：
+The project already keeps important pure logic in unit-testable layers. Prefer adding focused tests in these files:
 
 - `src/server/observer/normalize.test.ts`
 - `src/web/lib/commandSemantics.test.ts`
@@ -235,31 +235,31 @@ pnpm build
 - `src/web/state/workspace.test.ts`
 - `src/web/components/*.test.ts`
 
-经验规则：
+Rules of thumb:
 
-- 改事件归一化：补 `normalize` 测试
-- 改时间线聚合：补 `turns` 测试
-- 改进度提取：补 `progress` 测试
-- 改 patch/diff 显示策略：补 `diffViewData` 或组件测试
+- Event normalization change: add `normalize` tests.
+- Timeline grouping change: add `turns` tests.
+- Progress extraction change: add `progress` tests.
+- Patch/diff display change: add `diffViewData` or component tests.
 
-## 提交前检查
+## Pre-Commit Checks
 
-提交前至少确认以下几点：
+Before committing, confirm:
 
-- `pnpm test` 通过
-- `pnpm build` 通过
-- 没有把 `node_modules/`、`dist/`、`dist-server/`、`refs/` 提交进去
-- 文档描述没有超前于当前实现
+- `pnpm test` passes.
+- `pnpm build` passes.
+- `node_modules/`, `dist/`, `dist-server/`, and `refs/` are not committed.
+- Documentation does not describe behavior that is ahead of the implementation.
 
-## 非目标
+## Non-Goals
 
-当前仓库 **不是**：
+This repository is **not**:
 
-- 一个替代 Codex CLI 的新前端壳
-- 一个通用 LLM Chat UI
-- 一个以 token / trace / 调试指标为中心的观测平台
+- A new frontend shell that replaces Codex CLI
+- A generic LLM chat UI
+- An observability platform centered on tokens, traces, or debug metrics
 
-当前仓库 **是**：
+This repository **is**:
 
-- 一个围绕本地 Codex CLI 的观察与阅读工作台
-- 一个把 Markdown、工具调用、patch、多工程切换整合到一起的 GUI
+- A monitoring and reading workspace around local Codex CLI
+- A GUI that brings Markdown, tool calls, patches, and multi-project switching together

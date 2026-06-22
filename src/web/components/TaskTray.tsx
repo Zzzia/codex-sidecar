@@ -45,9 +45,9 @@ interface TrayGroupConfig {
 }
 
 const TRAY_GROUPS: TrayGroupConfig[] = [
-  { key: "running", label: "运行中", icon: Activity },
-  { key: "pendingReview", label: "待处理", icon: Inbox },
-  { key: "archived", label: "已收纳", icon: Archive },
+  { key: "running", label: "Running", icon: Activity },
+  { key: "pendingReview", label: "Needs review", icon: Inbox },
+  { key: "archived", label: "Archived", icon: Archive },
 ];
 
 function fallbackTitle(threadId: string): string {
@@ -66,7 +66,7 @@ function TrayItem({
   onPinToMain: (threadId: string) => void;
 }) {
   const status = summary?.status ?? "idle";
-  const projectName = summary?.displayName ?? "未知工程";
+  const projectName = summary?.displayName ?? "Unknown project";
   const title = summary ? formatThreadTitle(summary.title, projectName) : fallbackTitle(threadId);
 
   return (
@@ -87,8 +87,8 @@ function TrayItem({
       <button
         type="button"
         className="task-tray-pin-button"
-        title="放到主面板"
-        aria-label="放到主面板"
+        title="Pin to main area"
+        aria-label="Pin to main area"
         onClick={() => onPinToMain(threadId)}
       >
         <LayoutPanelTop size={13} />
@@ -127,7 +127,7 @@ export function TaskTray(props: TaskTrayProps) {
         </header>
         <div className="task-tray-list">
           {threadIds.length === 0 ? (
-            <div className="task-tray-empty">暂无会话</div>
+            <div className="task-tray-empty">No sessions</div>
           ) : (
             threadIds.map((threadId) => (
               <TrayItem
@@ -155,8 +155,8 @@ export function TaskTray(props: TaskTrayProps) {
           <section className="task-tray-panel">
             <header className="task-tray-panel-header">
               <div className="task-tray-limit">
-                <span>主面板最多</span>
-                <div className="task-tray-segmented" role="group" aria-label="主面板最多">
+                <span>Main panes</span>
+                <div className="task-tray-segmented" role="group" aria-label="Main panes">
                   {MAX_MAIN_PANE_OPTIONS.map((value) => (
                     <button
                       key={value}
@@ -168,13 +168,12 @@ export function TaskTray(props: TaskTrayProps) {
                     </button>
                   ))}
                 </div>
-                <span>个</span>
               </div>
               <button
                 type="button"
                 className="icon-button"
-                title="收起任务托盘"
-                aria-label="收起任务托盘"
+                title="Collapse task tray"
+                aria-label="Collapse task tray"
                 onClick={() => setExpanded(false)}
               >
                 <X size={15} />
@@ -182,7 +181,7 @@ export function TaskTray(props: TaskTrayProps) {
             </header>
             {props.state.pinnedThreadIds.length > props.maxMainPanes ? (
               <div className="task-tray-warning">
-                已固定 {props.state.pinnedThreadIds.length} 个，超过当前上限
+                {props.state.pinnedThreadIds.length} pinned sessions exceed the current limit
               </div>
             ) : null}
             {props.state.notice ? (
@@ -222,15 +221,15 @@ export function TaskTray(props: TaskTrayProps) {
           className="task-tray-bar"
           onClick={() => setExpanded((current) => !current)}
         >
-          <span>运行中 {view.counts.running}</span>
-          <span>待处理 {view.counts.pendingReview}</span>
-          <span>已收纳 {view.counts.archived}</span>
+          <span>Running {view.counts.running}</span>
+          <span>Needs review {view.counts.pendingReview}</span>
+          <span>Archived {view.counts.archived}</span>
           <strong>
             {view.latest
               ? `${formatThreadTitle(view.latest.title, view.latest.displayName)} · ${formatTrayTime(
                   view.latest.updatedAt,
                 )}`
-              : "暂无托盘会话"}
+              : "No tray sessions"}
           </strong>
           {expanded ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
         </button>

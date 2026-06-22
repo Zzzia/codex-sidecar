@@ -39,7 +39,7 @@ export function PaneProgress({
   return (
     <footer className="pane-progress">
       <div className="pane-progress-header">
-        <span className="pane-progress-title">进度</span>
+        <span className="pane-progress-title">Progress</span>
         <time className="pane-progress-time">{formatTimestamp(progress.ts)}</time>
       </div>
 

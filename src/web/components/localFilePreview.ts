@@ -44,7 +44,7 @@ export async function requestLocalFilePreview(
   );
   const payload = (await response.json()) as LocalFilePreview | { error?: string };
   if (!response.ok) {
-    throw new Error("error" in payload && payload.error ? payload.error : "文件预览失败");
+    throw new Error("error" in payload && payload.error ? payload.error : "File preview failed");
   }
   return payload as LocalFilePreview;
 }

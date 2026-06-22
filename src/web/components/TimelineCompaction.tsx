@@ -4,16 +4,16 @@ import { formatTimestamp } from "./timelineHelpers";
 
 function compactionMeta(item: CompactionRunView): string {
   const time = formatTimestamp(item.completedAt ?? item.ts);
-  const stateText = item.state === "completed" ? "已完成" : "进行中";
+  const stateText = item.state === "completed" ? "Completed" : "Running";
   if (typeof item.replacementItemCount === "number") {
-    return `${stateText} · ${item.replacementItemCount} 条历史项 · ${time}`;
+    return `${stateText} · ${item.replacementItemCount} history items · ${time}`;
   }
   return `${stateText} · ${time}`;
 }
 
 export function CompactionRunList({ items }: { items: CompactionRunView[] }) {
   return (
-    <div className="turn-compaction-list" aria-label="上下文压缩状态">
+    <div className="turn-compaction-list" aria-label="Context compaction status">
       {items.map((item) => {
         const StatusIcon = item.state === "completed" ? CheckCircle2 : LoaderCircle;
 

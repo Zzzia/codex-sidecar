@@ -45,13 +45,13 @@ function commandExecutionState(tool: ToolRunView): string {
   }
 
   if (tool.result.processId) {
-    return `后台运行中 · session ${tool.result.processId}`;
+    return `Running in background · session ${tool.result.processId}`;
   }
 
   if (tool.result.exitCode != null) {
     return tool.result.exitCode === 0
-      ? "已完成 · exit 0"
-      : `已结束 · exit ${tool.result.exitCode}`;
+      ? "Completed · exit 0"
+      : `Completed · exit ${tool.result.exitCode}`;
   }
 
   return "";
@@ -95,7 +95,7 @@ function PatchFilePreviewButton({
         setFilePreviewState({
           status: "error",
           href: previewHref,
-          message: error instanceof Error ? error.message : "文件预览失败",
+          message: error instanceof Error ? error.message : "File preview failed",
         });
       });
   };
@@ -105,8 +105,8 @@ function PatchFilePreviewButton({
       <button
         type="button"
         className="patch-preview-button"
-        title="预览完整文件"
-        aria-label={`预览完整文件：${fileName}`}
+        title="Preview full file"
+        aria-label={`Preview full file：${fileName}`}
         onClick={openFilePreview}
       >
         <FileSearch size={14} />
@@ -269,7 +269,7 @@ function InlinePatchFile({
               <button
                 type="button"
                 className="inline-patch-backtop"
-                title="回到此 patch 顶部"
+                title="Back to patch top"
                 onClick={(event) => {
                   event.preventDefault();
                   event.stopPropagation();
@@ -323,7 +323,7 @@ function ToolRunDetails({
   localFileContext?: LocalFileContext | null;
 }) {
   const invocationText = tool.commandText || tool.invocationText;
-  const invocationTitle = tool.commandText ? "命令" : "调用内容";
+  const invocationTitle = tool.commandText ? "Command" : "Invocation";
   const executionState = commandExecutionState(tool);
 
   return (
@@ -339,14 +339,14 @@ function ToolRunDetails({
 
       {executionState ? (
         <section className="tool-modal-section">
-          <h4>执行状态</h4>
+          <h4>Execution state</h4>
           <div className="tool-execution-state">{executionState}</div>
         </section>
       ) : null}
 
       {tool.result?.outputText ? (
         <section className="tool-modal-section">
-          <h4>工具输出</h4>
+          <h4>Tool output</h4>
           <CopyableCodeBlock
             className="code-block"
             copyText={tool.result.outputText}
@@ -358,7 +358,7 @@ function ToolRunDetails({
 
       {tool.result?.stderrText ? (
         <section className="tool-modal-section">
-          <h4>错误输出</h4>
+          <h4>Error output</h4>
           <CopyableCodeBlock
             className="code-block"
             copyText={tool.result.stderrText}
@@ -370,7 +370,7 @@ function ToolRunDetails({
 
       {tool.patchChanges.length > 0 ? (
         <section className="tool-modal-section">
-          <h4>代码修改</h4>
+          <h4>Code changes</h4>
           <div className="tool-patch-list">
             {tool.patchChanges.map((change) => (
               <PatchPreview
@@ -411,7 +411,7 @@ export function ToolDetailsModal({
             <div className="tool-modal-eyebrow">{toolLabel(tool.name)}</div>
             <h3 title={tool.preview}>{tool.preview}</h3>
           </div>
-          <button className="icon-button" onClick={onClose} title="关闭">
+          <button className="icon-button" onClick={onClose} title="Close">
             <X size={16} />
           </button>
         </header>
@@ -453,17 +453,17 @@ export function ExplorationDetailsModal({
       >
         <header className="tool-modal-header">
           <div className="tool-modal-title-wrap">
-            <div className="tool-modal-eyebrow">探索</div>
+            <div className="tool-modal-eyebrow">Exploration</div>
             <h3 title={stepSummary}>{stepSummary}</h3>
           </div>
-          <button className="icon-button" onClick={onClose} title="关闭">
+          <button className="icon-button" onClick={onClose} title="Close">
             <X size={16} />
           </button>
         </header>
 
         <div className="tool-modal-meta">
           <span>{formatTimestamp(step.ts)}</span>
-          <span>{step.tools.length} 条命令</span>
+          <span>{step.tools.length} commands</span>
         </div>
 
         {step.tools.map((tool) => (
