@@ -10,7 +10,7 @@ Codex Sidecar 面向仍然喜欢使用 **Codex CLI** 的开发者：终端里的
 
 Codex Sidecar 保持 CLI 作为真实工作入口，只在旁边增加一个浏览器监看工作台。它读取本地 Codex 状态库和 rollout 日志，把每个会话渲染成包含 Markdown、工具调用、patch、进度和多项目上下文的实时 Timeline。
 
-![Codex Sidecar Markdown and Mermaid rendering](./imgs/image-multi-render.png)
+![Codex Sidecar Markdown and Mermaid rendering](./imgs/image-multi-render.webp)
 
 上图展示的是目标场景：多个 Codex CLI 会话在不同项目中并行运行，浏览器中可以按项目聚合，并在工作区里直接渲染 Markdown 和 Mermaid 图表。
 

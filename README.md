@@ -10,7 +10,7 @@ The full Codex app can feel heavier than needed if your main workflow already li
 
 Codex Sidecar keeps the CLI as the source of truth and adds a browser-based monitoring workspace next to it. It reads local Codex state and rollout logs, then renders each session as a live timeline with Markdown, tool calls, patches, progress, and multi-project context.
 
-![Codex Sidecar Markdown and Mermaid rendering](./imgs/image-multi-render.png)
+![Codex Sidecar Markdown and Mermaid rendering](./imgs/image-multi-render.webp)
 
 The screenshot shows the intended use case: several Codex CLI sessions running in parallel, grouped by project, with rich Markdown and Mermaid rendering inside the browser workspace.
 
