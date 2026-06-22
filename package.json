@@ -1,9 +1,22 @@
 {
-  "name": "codex-app",
+  "name": "codex-sidecar",
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "description": "A lightweight companion UI for monitoring many local Codex CLI coding sessions in real time.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Zzzia/codex-sidecar.git"
+  },
+  "homepage": "https://github.com/Zzzia/codex-sidecar#readme",
+  "bugs": {
+    "url": "https://github.com/Zzzia/codex-sidecar/issues"
+  },
   "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "scripts": {
     "dev": "node tools/dev.mjs",
     "dev:server": "tsx watch --clear-screen=false src/server/index.ts",
