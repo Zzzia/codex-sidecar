@@ -1,22 +1,28 @@
 import type { ThreadStatus, ThreadSummary } from "@shared/types";
 import {
-  createEmptyAutoWorkspaceTray,
   DEFAULT_MAX_MAIN_PANES,
+  finalizeAutoWorkspaceState,
   makeLookup,
   MAX_ARCHIVED_THREADS,
   MAX_MAIN_PANE_OPTIONS,
-  orderVisiblePaneThreadIds,
+  MAX_OBSERVED_THREADS,
   removeId,
   sortOldest,
   sortRecent,
   threadStatus,
   unique,
-  withoutIds,
   type AutoWorkspaceState,
   type AutoWorkspaceTrayState,
   type ThreadLookup,
   type TrayBucket,
 } from "./autoWorkspaceModel.js";
+import { getAutoWorkspaceKnownThreadIds } from "./autoWorkspaceState.js";
+
+export {
+  createInitialAutoWorkspaceState,
+  getAutoWorkspaceKnownThreadIds,
+  normalizeAutoWorkspaceState,
+} from "./autoWorkspaceState.js";
 
 export {
   DEFAULT_MAX_MAIN_PANES,
@@ -25,35 +31,6 @@ export {
   type AutoWorkspaceState,
   type AutoWorkspaceTrayState,
 } from "./autoWorkspaceModel.js";
-
-export function createInitialAutoWorkspaceState(): AutoWorkspaceState {
-  return {
-    visiblePaneThreadIds: [],
-    pinnedThreadIds: [],
-    tray: createEmptyAutoWorkspaceTray(),
-    previewThreadId: null,
-    notice: null,
-  };
-}
-
-export function normalizeAutoWorkspaceState(
-  parsed: Partial<AutoWorkspaceState>,
-): AutoWorkspaceState {
-  return finalizeState(
-    {
-      visiblePaneThreadIds: unique(parsed.visiblePaneThreadIds ?? []),
-      pinnedThreadIds: unique(parsed.pinnedThreadIds ?? []),
-      tray: {
-        pendingReview: unique(parsed.tray?.pendingReview ?? []),
-        running: unique(parsed.tray?.running ?? []),
-        archived: unique(parsed.tray?.archived ?? []).slice(0, MAX_ARCHIVED_THREADS),
-      },
-      previewThreadId: null,
-      notice: null,
-    },
-    new Map(),
-  );
-}
 
 function addToBucket(
   tray: AutoWorkspaceTrayState,
@@ -150,7 +127,7 @@ function fillMainPanesFromRunningTray(
   return next;
 }
 
-function placeNewRunningThread(
+function placeRunningThread(
   state: AutoWorkspaceState,
   threadId: string,
   lookup: ThreadLookup,
@@ -186,53 +163,80 @@ function placeNewRunningThread(
   };
 }
 
-function finalizeState(
+function isReviewReadyStatus(status: ThreadStatus): boolean {
+  return status === "completed" || status === "error";
+}
+
+function readObservedUpdatedAt(
   state: AutoWorkspaceState,
+  threadId: string,
+): number | undefined {
+  return Object.hasOwn(state.observedThreadUpdatedAtById, threadId)
+    ? state.observedThreadUpdatedAtById[threadId]
+    : undefined;
+}
+
+function reconcileThreadObservation(
+  state: AutoWorkspaceState,
+  summary: ThreadSummary,
+  hasNewActivity: boolean,
   lookup: ThreadLookup,
-): AutoWorkspaceState {
-  const rawVisible = unique(state.visiblePaneThreadIds);
-  const rawVisibleSet = new Set(rawVisible);
-  const pinnedThreadIds = unique(state.pinnedThreadIds).filter((threadId) =>
-    rawVisibleSet.has(threadId),
-  );
-  const visible = orderVisiblePaneThreadIds(rawVisible, pinnedThreadIds);
-  const visibleSet = new Set(visible);
-  const running = sortRecent(withoutIds(state.tray.running, visibleSet), lookup);
-  const runningSet = new Set(running);
-  const pendingReview = sortRecent(
-    withoutIds(state.tray.pendingReview, new Set([...visibleSet, ...runningSet])),
-    lookup,
-  );
-  const blocked = new Set([...visibleSet, ...runningSet, ...pendingReview]);
-  const archived = sortRecent(withoutIds(state.tray.archived, blocked), lookup).slice(
-    0,
-    MAX_ARCHIVED_THREADS,
-  );
+): { state: AutoWorkspaceState; shouldPlaceRunning: boolean } {
+  if (state.visiblePaneThreadIds.includes(summary.id)) {
+    return { state, shouldPlaceRunning: false };
+  }
+
+  const isInRunningTray = state.tray.running.includes(summary.id);
+  if (summary.status === "running") {
+    // Running-tray placement records an explicit user/capacity decision.
+    if (isInRunningTray) {
+      return { state, shouldPlaceRunning: false };
+    }
+    return {
+      state: { ...state, tray: removeFromTray(state.tray, summary.id) },
+      shouldPlaceRunning: true,
+    };
+  }
+
+  if (
+    !isReviewReadyStatus(summary.status) ||
+    (!isInRunningTray && !hasNewActivity)
+  ) {
+    return { state, shouldPlaceRunning: false };
+  }
 
   return {
-    ...state,
-    visiblePaneThreadIds: visible,
-    pinnedThreadIds,
-    tray: {
-      pendingReview,
-      running,
-      archived,
+    state: {
+      ...state,
+      tray: addToBucket(
+        removeFromTray(state.tray, summary.id),
+        "pendingReview",
+        summary.id,
+        lookup,
+      ),
     },
-    previewThreadId: state.previewThreadId,
+    shouldPlaceRunning: false,
   };
 }
 
-export function getAutoWorkspaceKnownThreadIds(
-  state: AutoWorkspaceState,
-): string[] {
-  return unique([
-    ...state.visiblePaneThreadIds,
-    ...state.pinnedThreadIds,
-    ...state.tray.pendingReview,
-    ...state.tray.running,
-    ...state.tray.archived,
-    ...(state.previewThreadId ? [state.previewThreadId] : []),
-  ]).slice(0, 100);
+function recordThreadObservations(
+  previous: AutoWorkspaceState,
+  next: AutoWorkspaceState,
+  summaries: readonly ThreadSummary[],
+): Record<string, number> {
+  const observations = new Map<string, number>();
+  for (const summary of summaries) {
+    observations.set(summary.id, summary.updatedAt);
+  }
+
+  for (const threadId of getAutoWorkspaceKnownThreadIds(next)) {
+    const previousUpdatedAt = readObservedUpdatedAt(previous, threadId);
+    if (!observations.has(threadId) && previousUpdatedAt !== undefined) {
+      observations.set(threadId, previousUpdatedAt);
+    }
+  }
+
+  return Object.fromEntries([...observations].slice(0, MAX_OBSERVED_THREADS));
 }
 
 export function syncAutoWorkspaceThreads(
@@ -241,46 +245,43 @@ export function syncAutoWorkspaceThreads(
   maxMainPanes: number,
 ): AutoWorkspaceState {
   const lookup = makeLookup(summaries);
-  let next = finalizeState({ ...state, notice: null }, lookup);
-  const knownBefore = new Set(getAutoWorkspaceKnownThreadIds(state));
-  const newRunningThreadIds: string[] = [];
+  let next = finalizeAutoWorkspaceState({ ...state, notice: null }, lookup);
+  const runningThreadIdsToPlace: string[] = [];
 
   for (const summary of summaries) {
-    const isVisible = next.visiblePaneThreadIds.includes(summary.id);
-    const wasRunningTray = next.tray.running.includes(summary.id);
-
-    if (summary.status === "running") {
-      next = {
-        ...next,
-        tray: removeFromTray(next.tray, summary.id),
-      };
-      if (!isVisible && !knownBefore.has(summary.id)) {
-        newRunningThreadIds.push(summary.id);
-      }
-      continue;
-    }
-
-    next = {
-      ...next,
-      tray: {
-        ...next.tray,
-        running: removeId(next.tray.running, summary.id),
-      },
-    };
-    if (wasRunningTray && !isVisible) {
-      next = {
-        ...next,
-        tray: addToBucket(next.tray, "pendingReview", summary.id, lookup),
-      };
+    const previousUpdatedAt = readObservedUpdatedAt(state, summary.id);
+    const hasNewActivity =
+      state.threadObservationInitialized &&
+      previousUpdatedAt !== summary.updatedAt;
+    const result = reconcileThreadObservation(
+      next,
+      summary,
+      hasNewActivity,
+      lookup,
+    );
+    next = result.state;
+    if (result.shouldPlaceRunning) {
+      runningThreadIdsToPlace.push(summary.id);
     }
   }
 
   next = trimToMainPaneLimit(next, lookup, maxMainPanes);
-  for (const threadId of sortRecent(newRunningThreadIds, lookup)) {
-    next = placeNewRunningThread(next, threadId, lookup, maxMainPanes);
+  for (const threadId of sortRecent(runningThreadIdsToPlace, lookup)) {
+    next = placeRunningThread(next, threadId, lookup, maxMainPanes);
   }
 
-  return finalizeState(next, lookup);
+  return finalizeAutoWorkspaceState(
+    {
+      ...next,
+      threadObservationInitialized: true,
+      observedThreadUpdatedAtById: recordThreadObservations(
+        state,
+        next,
+        summaries,
+      ),
+    },
+    lookup,
+  );
 }
 
 export function setAutoWorkspaceMaxMainPanes(
@@ -290,7 +291,7 @@ export function setAutoWorkspaceMaxMainPanes(
 ): AutoWorkspaceState {
   const lookup = makeLookup(summaries);
   const trimmed = trimToMainPaneLimit({ ...state, notice: null }, lookup, maxMainPanes);
-  return finalizeState(
+  return finalizeAutoWorkspaceState(
     fillMainPanesFromRunningTray(trimmed, lookup, maxMainPanes),
     lookup,
   );
@@ -303,10 +304,10 @@ export function pinAutoWorkspaceThreadToMain(
   maxMainPanes: number,
 ): AutoWorkspaceState {
   const lookup = makeLookup(summaries);
-  let next = finalizeState({ ...state, notice: null }, lookup);
+  let next = finalizeAutoWorkspaceState({ ...state, notice: null }, lookup);
 
   if (next.visiblePaneThreadIds.includes(threadId)) {
-    return finalizeState(
+    return finalizeAutoWorkspaceState(
       {
         ...next,
         pinnedThreadIds: unique([...next.pinnedThreadIds, threadId]),
@@ -329,7 +330,7 @@ export function pinAutoWorkspaceThreadToMain(
     next = moveVisibleThreadToTray(next, evicted, lookup);
   }
 
-  return finalizeState(
+  return finalizeAutoWorkspaceState(
     {
       ...next,
       visiblePaneThreadIds: unique([...next.visiblePaneThreadIds, threadId]),
@@ -353,7 +354,10 @@ export function unpinAutoWorkspaceThread(
     pinnedThreadIds: removeId(state.pinnedThreadIds, threadId),
     notice: null,
   };
-  return finalizeState(trimToMainPaneLimit(unpinned, lookup, maxMainPanes), lookup);
+  return finalizeAutoWorkspaceState(
+    trimToMainPaneLimit(unpinned, lookup, maxMainPanes),
+    lookup,
+  );
 }
 
 export function closeAutoWorkspaceMainThread(
@@ -364,7 +368,7 @@ export function closeAutoWorkspaceMainThread(
   const lookup = makeLookup(summaries);
   const status = threadStatus(lookup, threadId);
   const bucket: TrayBucket = status === "running" ? "running" : "archived";
-  return finalizeState(
+  return finalizeAutoWorkspaceState(
     {
       ...state,
       visiblePaneThreadIds: removeId(state.visiblePaneThreadIds, threadId),
@@ -402,7 +406,7 @@ export function closeAutoWorkspacePreview(
     ? addToBucket(removeFromTray(state.tray, threadId), "archived", threadId, lookup)
     : state.tray;
 
-  return finalizeState(
+  return finalizeAutoWorkspaceState(
     {
       ...state,
       tray,
@@ -426,7 +430,7 @@ export function archiveAutoWorkspaceThread(
       notice: null,
     };
   }
-  return finalizeState(
+  return finalizeAutoWorkspaceState(
     {
       ...state,
       tray: addToBucket(removeFromTray(state.tray, threadId), "archived", threadId, lookup),
