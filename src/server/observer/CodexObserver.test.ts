@@ -21,7 +21,7 @@ async function runSqlite(dbPath: string, sql: string): Promise<void> {
   await execFileAsync("sqlite3", [dbPath, sql]);
 }
 
-test("listActiveThreads only returns refreshed running CLI threads", async (t) => {
+test("listRecentThreads returns refreshed CLI threads in update order", async (t) => {
   const workspace = await mkdtemp(path.join(os.tmpdir(), "codex-sidecar-observer-"));
   t.after(() => rm(workspace, { recursive: true, force: true }));
 
@@ -69,11 +69,13 @@ test("listActiveThreads only returns refreshed running CLI threads", async (t) =
   );
 
   const observer = new CodexObserver(dbPath);
-  const activeThreads = await observer.listActiveThreads();
+  const recentThreads = await observer.listRecentThreads();
 
   assert.deepEqual(
-    activeThreads.map((thread) => thread.id),
-    ["running-thread"],
+    recentThreads.map((thread) => ({ id: thread.id, status: thread.status })),
+    [
+      { id: "completed-thread", status: "completed" },
+      { id: "running-thread", status: "running" },
+    ],
   );
-  assert.equal(activeThreads[0]?.status, "running");
 });

@@ -59,6 +59,8 @@ export function saveAutoWorkspaceState(
       visiblePaneThreadIds: state.visiblePaneThreadIds,
       pinnedThreadIds: state.pinnedThreadIds,
       tray: state.tray,
+      threadObservationInitialized: state.threadObservationInitialized,
+      observedThreadUpdatedAtById: state.observedThreadUpdatedAtById,
     }),
   );
 }

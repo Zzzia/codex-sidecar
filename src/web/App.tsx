@@ -10,7 +10,6 @@ import {
   closeAutoWorkspaceMainThread,
   closeAutoWorkspacePreview,
   createInitialAutoWorkspaceState,
-  getAutoWorkspaceKnownThreadIds,
   openAutoWorkspacePreview,
   pinAutoWorkspaceThreadToMain,
   setAutoWorkspaceMaxMainPanes,
@@ -32,8 +31,7 @@ import {
 import { reconcileWorkspaceToThreads } from "@web/state/workspaceReconcile";
 
 const SIDEBAR_OPEN_KEY = "codex-app.sidebar-pinned.v2";
-const ACTIVE_THREADS_POLL_INTERVAL_MS = 3000;
-const KNOWN_THREADS_POLL_INTERVAL_MS = 5000;
+const RECENT_THREADS_POLL_INTERVAL_MS = 3000;
 const PROJECT_SIDEBAR_ENABLED = false;
 const KEYBOARD_EVENT_TYPES = ["keydown", "keypress", "keyup"] as const;
 
@@ -91,7 +89,6 @@ export default function App() {
     typeof window === "undefined" ? true : loadSidebarOpen(),
   );
   const [syncError, setSyncError] = useState<string | null>(null);
-  const autoWorkspaceRef = useRef(autoWorkspace);
   const threadSummariesRef = useRef(threadSummaries);
   const maxMainPanesRef = useRef(maxMainPanes);
 
@@ -116,7 +113,6 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    autoWorkspaceRef.current = autoWorkspace;
     saveAutoWorkspaceState(autoWorkspace);
   }, [autoWorkspace]);
 
@@ -153,11 +149,11 @@ export default function App() {
   };
 
   const syncThreadSummaries = (summaries: readonly ThreadSummary[]) => {
-    const allSummaries = rememberThreadSummaries(summaries);
+    rememberThreadSummaries(summaries);
     setAutoWorkspace((current) =>
       syncAutoWorkspaceThreads(
         current,
-        allSummaries,
+        summaries,
         maxMainPanesRef.current,
       ),
     );
@@ -165,54 +161,16 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
+    let refreshing = false;
 
-    const refreshActiveThreads = async () => {
-      try {
-        const data = await fetchJson<{ items: ThreadSummary[] }>(
-          "/api/threads/active",
-        );
-        if (cancelled) {
-          return;
-        }
-        syncThreadSummaries(data.items);
-        setSyncError(null);
-      } catch (error) {
-        if (!cancelled) {
-          setSyncError(
-            error instanceof Error ? error.message : "Failed to sync active sessions",
-          );
-        }
-      }
-    };
-
-    void refreshActiveThreads();
-    const timer = window.setInterval(
-      refreshActiveThreads,
-      ACTIVE_THREADS_POLL_INTERVAL_MS,
-    );
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const refreshKnownThreads = async () => {
-      const threadIds = getAutoWorkspaceKnownThreadIds(autoWorkspaceRef.current);
-      if (threadIds.length === 0) {
+    const refreshRecentThreads = async () => {
+      if (refreshing) {
         return;
       }
-
-      const params = new URLSearchParams();
-      for (const threadId of threadIds) {
-        params.append("id", threadId);
-      }
-
+      refreshing = true;
       try {
         const data = await fetchJson<{ items: ThreadSummary[] }>(
-          `/api/thread-summaries?${params.toString()}`,
+          "/api/threads/recent",
         );
         if (cancelled) {
           return;
@@ -222,16 +180,18 @@ export default function App() {
       } catch (error) {
         if (!cancelled) {
           setSyncError(
-            error instanceof Error ? error.message : "Failed to sync session status",
+            error instanceof Error ? error.message : "Failed to sync recent sessions",
           );
         }
+      } finally {
+        refreshing = false;
       }
     };
 
-    void refreshKnownThreads();
+    void refreshRecentThreads();
     const timer = window.setInterval(
-      refreshKnownThreads,
-      KNOWN_THREADS_POLL_INTERVAL_MS,
+      refreshRecentThreads,
+      RECENT_THREADS_POLL_INTERVAL_MS,
     );
     return () => {
       cancelled = true;

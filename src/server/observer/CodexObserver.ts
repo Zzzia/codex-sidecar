@@ -116,7 +116,7 @@ export class CodexObserver {
     };
   }
 
-  async listActiveThreads(limit = 200): Promise<ThreadSummary[]> {
+  async listRecentThreads(limit = 200): Promise<ThreadSummary[]> {
     const rows = await listRecentCliThreads(this.dbPath, limit);
     const summaries = await Promise.all(
       rows.map(async (row) => {
@@ -126,9 +126,7 @@ export class CodexObserver {
       }),
     );
 
-    return summaries
-      .filter((summary) => summary.status === "running")
-      .sort((left, right) => right.updatedAt - left.updatedAt);
+    return summaries.sort((left, right) => right.updatedAt - left.updatedAt);
   }
 
   async getThreadSnapshot(threadId: string): Promise<ThreadSnapshot> {

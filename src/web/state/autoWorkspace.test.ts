@@ -11,7 +11,10 @@ import {
   unpinAutoWorkspaceThread,
 } from "./autoWorkspace.js";
 import {
+  AUTO_WORKSPACE_STORAGE_KEY,
+  loadAutoWorkspaceState,
   loadMaxMainPanes,
+  saveAutoWorkspaceState,
   saveMaxMainPanes,
 } from "./autoWorkspaceStorage.js";
 
@@ -58,6 +61,54 @@ test("max main panes setting defaults to 3 and persists allowed values", () => {
   assert.equal(loadMaxMainPanes(storage), 6);
   saveMaxMainPanes(9, storage);
   assert.equal(loadMaxMainPanes(storage), 3);
+});
+
+test("auto workspace persists its thread observation baseline", () => {
+  const storage = fakeStorage();
+  const state = syncAutoWorkspaceThreads(
+    createInitialAutoWorkspaceState(),
+    [summary("observed-thread", "completed", 10)],
+    3,
+  );
+
+  saveAutoWorkspaceState(state, storage);
+
+  assert.deepEqual(loadAutoWorkspaceState(storage), state);
+});
+
+test("stored workspace without observations establishes a fresh baseline", () => {
+  const storage = fakeStorage({
+    [AUTO_WORKSPACE_STORAGE_KEY]: JSON.stringify({
+      visiblePaneThreadIds: [],
+      pinnedThreadIds: [],
+      tray: { pendingReview: [], running: [], archived: [] },
+    }),
+  });
+
+  const state = loadAutoWorkspaceState(storage);
+
+  assert.equal(state.threadObservationInitialized, false);
+  assert.deepEqual(state.observedThreadUpdatedAtById, {});
+});
+
+test("stored workspace drops invalid thread observation timestamps", () => {
+  const storage = fakeStorage({
+    [AUTO_WORKSPACE_STORAGE_KEY]: JSON.stringify({
+      visiblePaneThreadIds: [],
+      pinnedThreadIds: [],
+      tray: { pendingReview: [], running: [], archived: [] },
+      threadObservationInitialized: true,
+      observedThreadUpdatedAtById: {
+        valid: 10,
+        negative: -1,
+        text: "20",
+      },
+    }),
+  });
+
+  const state = loadAutoWorkspaceState(storage);
+
+  assert.deepEqual(state.observedThreadUpdatedAtById, { valid: 10 });
 });
 
 test("syncAutoWorkspaceThreads keeps at most max running panes visible", () => {
@@ -250,6 +301,95 @@ test("running tray completion moves to pending, preview close archives it", () =
   state = closeAutoWorkspacePreview(state, completed);
   assert.deepEqual(state.tray.pendingReview, []);
   assert.deepEqual(state.tray.archived, ["thread-1"]);
+});
+
+test("completed thread discovered after the initial baseline enters pending review", () => {
+  const historical = summary("historical", "completed", 10);
+  let state = syncAutoWorkspaceThreads(
+    createInitialAutoWorkspaceState(),
+    [historical],
+    3,
+  );
+  assert.deepEqual(state.tray.pendingReview, []);
+
+  state = syncAutoWorkspaceThreads(
+    state,
+    [historical, summary("fast-thread", "completed", 20)],
+    3,
+  );
+
+  assert.deepEqual(state.visiblePaneThreadIds, []);
+  assert.deepEqual(state.tray.pendingReview, ["fast-thread"]);
+});
+
+test("archived thread completed between polls returns to pending review", () => {
+  const completed = summary("resumed-thread", "completed", 10);
+  let state = syncAutoWorkspaceThreads(
+    createInitialAutoWorkspaceState(),
+    [completed],
+    3,
+  );
+  state = {
+    ...state,
+    tray: {
+      ...state.tray,
+      archived: ["resumed-thread"],
+    },
+  };
+
+  state = syncAutoWorkspaceThreads(
+    state,
+    [summary("resumed-thread", "completed", 20)],
+    3,
+  );
+
+  assert.deepEqual(state.tray.pendingReview, ["resumed-thread"]);
+  assert.deepEqual(state.tray.archived, []);
+});
+
+test("archived thread returns to the main area when it resumes", () => {
+  const completed = summary("resumed-thread", "completed", 10);
+  let state = syncAutoWorkspaceThreads(
+    createInitialAutoWorkspaceState(),
+    [completed],
+    3,
+  );
+  state = {
+    ...state,
+    tray: {
+      ...state.tray,
+      archived: ["resumed-thread"],
+    },
+  };
+
+  state = syncAutoWorkspaceThreads(
+    state,
+    [summary("resumed-thread", "running", 20)],
+    3,
+  );
+
+  assert.deepEqual(state.visiblePaneThreadIds, ["resumed-thread"]);
+  assert.deepEqual(state.tray.archived, []);
+});
+
+test("running thread parked in the tray stays there while it continues", () => {
+  const state = {
+    ...createInitialAutoWorkspaceState(),
+    tray: {
+      pendingReview: [],
+      running: ["parked-thread"],
+      archived: [],
+    },
+  };
+
+  const next = syncAutoWorkspaceThreads(
+    state,
+    [summary("parked-thread", "running", 20)],
+    3,
+  );
+
+  assert.deepEqual(next.visiblePaneThreadIds, []);
+  assert.deepEqual(next.tray.running, ["parked-thread"]);
 });
 
 test("opening preview does not change visible panes", () => {

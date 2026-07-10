@@ -39,6 +39,8 @@ function trayState(overrides: Partial<AutoWorkspaceState> = {}): AutoWorkspaceSt
       running: [],
       archived: [],
     },
+    threadObservationInitialized: false,
+    observedThreadUpdatedAtById: {},
     previewThreadId: null,
     notice: null,
     ...overrides,
