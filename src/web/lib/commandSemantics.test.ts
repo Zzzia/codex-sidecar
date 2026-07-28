@@ -192,6 +192,37 @@ for (const r of out) text(\`## \${r.name}\\n\${r.output}\`);`;
   ]);
 });
 
+test("extractNestedExecCommandTexts resolves nested args.cmd via tools.exec_command(x.args)", () => {
+  const script = `const calls = [
+  {
+    name: "runtime_debug_exact",
+    args: {
+      cmd: "sed -n '1,180p' src/agentruntime/agentapp/_debug_options.py\\nsed -n '180,280p' src/agentruntime/agentapp/_agent_chat_runner.py",
+      workdir: "/home/zia/project/AgentHubProject/lighten-agent-runtime",
+      yield_time_ms: 10000,
+      max_output_tokens: 26000
+    }
+  },
+  {
+    name: "orch_a2a_tests_exact",
+    args: {
+      cmd: "rg -n \\"session_id\\" tests/unit/test_a2a_router.py",
+      workdir: "/home/zia/project/AgentHubProject/lighten-agent-orchestrator",
+      yield_time_ms: 10000,
+      max_output_tokens: 30000
+    }
+  }
+];
+const results = await Promise.all(calls.map(async x => ({name:x.name, ...(await tools.exec_command(x.args))})));
+for (const r of results) text(\`\\n===== \${r.name} =====\\n\${r.output}\`);`;
+
+  // Newlines inside cmd strings are normalized by shell display helpers.
+  assert.deepEqual(extractNestedExecCommandTexts(script), [
+    "sed -n '1,180p' src/agentruntime/agentapp/_debug_options.py sed -n '180,280p' src/agentruntime/agentapp/_agent_chat_runner.py",
+    'rg -n "session_id" tests/unit/test_a2a_router.py',
+  ]);
+});
+
 test("extractNestedExecCommandTexts resolves shorthand {cmd} from label/command tuples", () => {
   const script = `const pushes = [
   ["skill_studio","git push origin HEAD:jiangzilai/dual-agent-kind"],

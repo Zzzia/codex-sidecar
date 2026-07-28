@@ -103,8 +103,13 @@ function collectCmdLiteralsFromObjectLiterals(scriptText: string): string[] {
     const field = extractCmdFieldFromObjectLiteral(objectLiteral.text);
     if (field?.kind === "literal") {
       commands.push(stripShellWrapper(field.value));
+      // This object already owns a cmd field; skip its body.
+      index = objectLiteral.endIndex;
+      continue;
     }
-    index = objectLiteral.endIndex;
+    // Nested cmd may live inside wrappers like `{ name, args: { cmd, workdir } }`.
+    // Advance one char so the inner `{` is still discovered.
+    index += 1;
   }
   return commands;
 }
