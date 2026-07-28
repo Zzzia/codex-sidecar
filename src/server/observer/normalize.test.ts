@@ -272,6 +272,48 @@ test("normalizeRecord preserves parsed exec commands from exec_command_end", () 
   ]);
 });
 
+test("normalizeRecord flattens code-mode exec custom_tool_call_output parts", () => {
+  const events = normalizeRecord(
+    {
+      timestamp: "2026-07-27T06:54:54.900Z",
+      type: "response_item",
+      payload: {
+        type: "custom_tool_call_output",
+        call_id: "call-exec",
+        output: [
+          { type: "input_text", text: "Script completed\nWall time 0.0 seconds\nOutput:\n" },
+          {
+            type: "input_text",
+            text: JSON.stringify({
+              chunk_id: "30c87b",
+              wall_time_seconds: 0.12,
+              exit_code: 0,
+              output: "./.git\n./src/.git\n",
+            }),
+          },
+        ],
+      },
+    },
+    {
+      row,
+      callNames: new Map([["call-exec", "exec"]]),
+      status: "running",
+    },
+    1,
+  );
+
+  assert.equal(events.length, 1);
+  assert.equal(events[0]?.kind, "tool_result");
+  if (events[0]?.kind !== "tool_result") {
+    assert.fail("expected tool_result event");
+  }
+  assert.equal(events[0].name, "exec");
+  assert.equal(events[0].result.exitCode, 0);
+  assert.equal(events[0].result.success, true);
+  assert.equal(events[0].result.outputText, "./.git\n./src/.git\n");
+  assert.equal(events[0].result.wallTimeSeconds, 0.12);
+});
+
 test("normalizeRecord preserves plain exec command output from function_call_output", () => {
   const events = normalizeRecord(
     {

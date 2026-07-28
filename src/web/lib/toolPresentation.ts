@@ -1,5 +1,8 @@
 import type { ToolResultPayload } from "@shared/types";
-import { extractExecCommandText } from "./commandSemantics";
+import {
+  isShellToolName,
+  shellCommandTextFromInvocation,
+} from "./commandSemantics";
 import { compactWhitespace, stripShellWrapper } from "./shellParsing";
 
 function tryParseJson(text: string): Record<string, unknown> | null {
@@ -25,7 +28,7 @@ function patchPreview(patchText: string): string {
 }
 
 export function commandTextFromResult(result: ToolResultPayload): string {
-  if (result.toolType !== "exec_command_end" || !result.raw || typeof result.raw !== "object") {
+  if (!result.raw || typeof result.raw !== "object") {
     return "";
   }
 
@@ -46,8 +49,8 @@ export function toolPreview(name: string, invocationText: string): string {
     return name;
   }
 
-  if (name === "exec_command") {
-    const commandText = extractExecCommandText(invocationText);
+  if (isShellToolName(name)) {
+    const commandText = shellCommandTextFromInvocation(name, invocationText);
     if (commandText) {
       return commandText;
     }

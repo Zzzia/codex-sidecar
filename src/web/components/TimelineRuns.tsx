@@ -22,8 +22,12 @@ function truncateMiddle(value: string, maxLength: number): string {
   return `${value.slice(0, head)}…${value.slice(-tail)}`;
 }
 
+function isShellTool(name: string): boolean {
+  return name === "exec_command" || name === "exec";
+}
+
 function toolDisplayName(tool: ToolRunView): string {
-  if (tool.name === "exec_command") {
+  if (isShellTool(tool.name)) {
     return "Run";
   }
   return tool.name;
@@ -46,11 +50,11 @@ function toolBadgeText(tool: ToolRunView): string {
     return `exit ${tool.result.exitCode}`;
   }
 
-  if (tool.result?.success === true && tool.name === "exec_command") {
+  if (tool.result?.success === true && isShellTool(tool.name)) {
     return "";
   }
 
-  if (tool.name === "exec_command" && tool.result?.processId) {
+  if (isShellTool(tool.name) && tool.result?.processId) {
     return "Running";
   }
 

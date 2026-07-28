@@ -190,6 +190,55 @@ test("buildTurnCards coalesces exploratory exec commands into one exploration bl
   assert.equal(cards[0].blocks[0].items[1].tools.length, 2);
 });
 
+test("buildTurnCards classifies code-mode exec scripts as exploration reads/searches", () => {
+  const events: TimelineEvent[] = [
+    {
+      id: "u1",
+      ts: "2026-04-22T08:00:01.000Z",
+      kind: "message",
+      role: "user",
+      text: "看看这些文件",
+      isPlan: false,
+    },
+    {
+      id: "c1",
+      ts: "2026-04-22T08:00:02.000Z",
+      kind: "tool_call",
+      callId: "call-exec",
+      tool: {
+        name: "exec",
+        argumentsText: `const results = await Promise.all([
+  tools.exec_command({
+    cmd: "rg -n \\"buildTurnCards\\" src/web/lib",
+    yield_time_ms: 10000
+  }),
+  tools.exec_command({
+    cmd: "sed -n '1,120p' src/web/lib/turns.ts",
+    yield_time_ms: 10000
+  })
+]);`,
+        toolType: "custom_tool_call",
+      },
+    },
+  ];
+
+  const cards = buildTurnCards(events);
+  assert.equal(cards.length, 1);
+  assert.equal(cards[0]?.blocks.length, 1);
+  assert.equal(cards[0]?.blocks[0]?.type, "exploration_runs");
+  if (cards[0]?.blocks[0]?.type !== "exploration_runs") {
+    assert.fail("expected exploration block");
+  }
+
+  const kinds = cards[0].blocks[0].items.map((item) => item.kind);
+  assert.deepEqual(kinds, ["search", "read"]);
+  const tool = cards[0].blocks[0].items[0]?.tools[0];
+  assert.equal(tool?.name, "exec");
+  assert.match(tool?.commandText ?? "", /rg -n/);
+  assert.match(tool?.commandText ?? "", /sed -n/);
+  assert.doesNotMatch(tool?.preview ?? "", /const results = await/);
+});
+
 test("buildTurnCards reclassifies exec_command into exploration when parsed commands arrive in result", () => {
   const events: TimelineEvent[] = [
     {

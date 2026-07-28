@@ -1,6 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { extractExecCommandText, parseExecCommand } from "./commandSemantics.js";
+import {
+  extractExecCommandText,
+  extractNestedExecCommandTexts,
+  extractShellCommandTexts,
+  parseExecCommand,
+  shellCommandTextFromInvocation,
+} from "./commandSemantics.js";
 
 test("parseExecCommand keeps search intent when piping into formatting helpers", () => {
   const commands = parseExecCommand('rg -n "buildTurnCards" src/web/lib | head -n 5');
@@ -41,4 +47,53 @@ test("extractExecCommandText strips bash wrapper from exec invocation", () => {
   );
 
   assert.equal(commandText, "sed -n '1,120p' src/web/components/Timeline.tsx");
+});
+
+test("extractNestedExecCommandTexts reads cmds from code-mode exec scripts", () => {
+  const script = `const results = await Promise.all([
+  tools.exec_command({
+    cmd: "find . -maxdepth 3 -type d -name .git -print | sort",
+    workdir: "/home/zia/project/AgentHubProject",
+    yield_time_ms: 10000,
+    max_output_tokens: 4000
+  }),
+  tools.exec_command({
+    cmd: "rg --files -g 'AGENTS.md' | sort",
+    workdir: "/home/zia/project/AgentHubProject"
+  }),
+  tools.exec_command({
+    cmd: "sed -n '1,280p' docs/code-agent-ppt-e2e-test.md",
+    workdir: "/home/zia/project/AgentHubProject"
+  })
+]);`;
+
+  assert.deepEqual(extractNestedExecCommandTexts(script), [
+    "find . -maxdepth 3 -type d -name .git -print | sort",
+    "rg --files -g 'AGENTS.md' | sort",
+    "sed -n '1,280p' docs/code-agent-ppt-e2e-test.md",
+  ]);
+});
+
+test("extractShellCommandTexts supports both exec_command JSON and code-mode exec", () => {
+  assert.deepEqual(
+    extractShellCommandTexts(
+      "exec_command",
+      JSON.stringify({ cmd: "rg -n TODO src" }),
+    ),
+    ["rg -n TODO src"],
+  );
+
+  const script = `const result = await tools.exec_command({
+  cmd: "sed -n '1,240p' /tmp/foo.md",
+  yield_time_ms: 10000
+});
+text(result.output);`;
+
+  assert.deepEqual(extractShellCommandTexts("exec", script), [
+    "sed -n '1,240p' /tmp/foo.md",
+  ]);
+  assert.equal(
+    shellCommandTextFromInvocation("exec", script),
+    "sed -n '1,240p' /tmp/foo.md",
+  );
 });

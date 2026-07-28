@@ -200,6 +200,97 @@ function processIdFromInvocationArguments(argumentsText: string): string | undef
   }
 }
 
+function flattenCodeModeOutputParts(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (!Array.isArray(value)) {
+    return "";
+  }
+
+  return value
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") {
+        return "";
+      }
+      const record = entry as Record<string, unknown>;
+      return typeof record.text === "string" ? record.text : "";
+    })
+    .filter(Boolean)
+    .join("");
+}
+
+function parseCodeModeScriptOutput(
+  parsed: unknown,
+  rawOutput: string,
+): ParsedCodexCommandOutput | null {
+  const flattened =
+    flattenCodeModeOutputParts(parsed) ||
+    (typeof rawOutput === "string" ? rawOutput : "");
+  if (!flattened.trim()) {
+    return null;
+  }
+
+  // Prefer nested exec_command JSON chunks; ignore freeform script headers.
+  if (Array.isArray(parsed)) {
+    const chunkOutputs: string[] = [];
+    let exitCode: number | null = null;
+    let wallTimeSeconds: number | undefined;
+    let processId: string | undefined;
+
+    for (const entry of parsed) {
+      if (!entry || typeof entry !== "object") {
+        continue;
+      }
+      const text = (entry as Record<string, unknown>).text;
+      if (typeof text !== "string" || !text.trim()) {
+        continue;
+      }
+
+      const asJson = parseJsonString(text);
+      if (!asJson || typeof asJson !== "object" || Array.isArray(asJson)) {
+        continue;
+      }
+
+      const record = asJson as Record<string, unknown>;
+      if (typeof record.output === "string") {
+        chunkOutputs.push(record.output);
+      }
+      exitCode = numberFromField(record.exit_code) ?? exitCode;
+      wallTimeSeconds =
+        numberFromField(record.wall_time_seconds) ?? wallTimeSeconds;
+      processId =
+        stringFromField(record.session_id) ??
+        stringFromField(record.process_id) ??
+        processId;
+    }
+
+    if (chunkOutputs.length > 0) {
+      return {
+        exitCode,
+        wallTimeSeconds,
+        processId,
+        outputText: chunkOutputs.join("\n"),
+        stderrText: "",
+        rawOutput: flattened,
+      };
+    }
+  }
+
+  const textParsed = parseTextCodexCommandOutput(flattened);
+  if (textParsed) {
+    return textParsed;
+  }
+
+  return {
+    exitCode: parseExitCodeFromOutput(flattened),
+    outputText: flattened,
+    stderrText: "",
+    rawOutput: flattened,
+  };
+}
+
 export function normalizeToolOutput(
   payload: Record<string, unknown>,
   fallbackTitle: string,
@@ -208,31 +299,38 @@ export function normalizeToolOutput(
   const rawOutput = typeof payload.output === "string" ? payload.output : "";
   const parsed = parseJsonString(payload.output);
   const data =
-    parsed && typeof parsed === "object"
+    parsed && typeof parsed === "object" && !Array.isArray(parsed)
       ? (parsed as Record<string, unknown>)
       : ({} as Record<string, unknown>);
   const metadata =
     data.metadata && typeof data.metadata === "object"
       ? (data.metadata as Record<string, unknown>)
       : {};
-  const execOutput =
-    fallbackTitle === "exec_command" || fallbackTitle === "write_stdin"
-      ? parseExecCommandFunctionOutput(parsed, rawOutput)
-      : null;
+  const isShellResultTool =
+    fallbackTitle === "exec_command" ||
+    fallbackTitle === "write_stdin" ||
+    fallbackTitle === "exec";
+  const execOutput = isShellResultTool
+    ? fallbackTitle === "exec"
+      ? parseCodeModeScriptOutput(parsed, rawOutput)
+      : parseExecCommandFunctionOutput(parsed, rawOutput)
+    : null;
   const invocationProcessId =
     fallbackTitle === "write_stdin"
       ? processIdFromInvocationArguments(invocationArgumentsText)
       : undefined;
   const outputText = execOutput
     ? execOutput.outputText
-    : (typeof data.output === "string" ? data.output : "") || rawOutput;
+    : (typeof data.output === "string" ? data.output : "") ||
+      flattenCodeModeOutputParts(parsed) ||
+      rawOutput;
   const stderrText =
     execOutput?.stderrText ?? (typeof data.stderr === "string" ? data.stderr : "");
   const exitCode =
     execOutput?.exitCode ??
     numberFromField(data.exit_code) ??
     numberFromField(metadata.exit_code) ??
-    parseExitCodeFromOutput(rawOutput);
+    parseExitCodeFromOutput(rawOutput || flattenCodeModeOutputParts(parsed));
 
   return {
     toolType:
@@ -245,7 +343,7 @@ export function normalizeToolOutput(
     outputText,
     stderrText,
     parsedCommands: [],
-    raw: execOutput ? { ...execOutput, rawOutput } : parsed,
+    raw: execOutput ? { ...execOutput, rawOutput: execOutput.rawOutput ?? rawOutput } : parsed,
     processId: execOutput?.processId ?? invocationProcessId,
     wallTimeSeconds: execOutput?.wallTimeSeconds,
     outputLineCount: execOutput?.outputLineCount,

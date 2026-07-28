@@ -25,7 +25,7 @@ import {
 } from "./timelineHelpers";
 
 function toolLabel(name: string): string {
-  return name === "exec_command" ? "Run" : name;
+  return name === "exec_command" || name === "exec" ? "Run" : name;
 }
 
 function renderPageModal(content: ReactNode): ReactNode {
@@ -40,7 +40,7 @@ function formatWallTime(seconds: number): string {
 }
 
 function commandExecutionState(tool: ToolRunView): string {
-  if (tool.name !== "exec_command" || !tool.result) {
+  if ((tool.name !== "exec_command" && tool.name !== "exec") || !tool.result) {
     return "";
   }
 

@@ -1,4 +1,5 @@
 import type { ParsedCommand } from "@shared/types";
+import { extractNestedExecCommandTexts } from "./codeModeExec";
 import {
   commandBasename,
   compactWhitespace,
@@ -11,6 +12,7 @@ import {
 } from "./shellParsing";
 
 export type ParsedExecCommand = ParsedCommand;
+export { extractNestedExecCommandTexts } from "./codeModeExec";
 
 function tryParseJson(text: string): Record<string, unknown> | null {
   try {
@@ -296,6 +298,11 @@ function parseSegment(tokens: string[]): ParsedExecCommand | null {
   };
 }
 
+/** Tools whose invocation ultimately runs shell commands we can classify. */
+export function isShellToolName(toolName: string): boolean {
+  return toolName === "exec_command" || toolName === "exec";
+}
+
 export function extractExecCommandText(invocationText: string): string {
   if (!invocationText.trim()) {
     return "";
@@ -308,6 +315,34 @@ export function extractExecCommandText(invocationText: string): string {
   }
 
   return stripShellWrapper(invocationText);
+}
+
+/**
+ * Canonical extraction of shell command texts for shell-capable tools.
+ * - exec_command: JSON `{ cmd }` (or raw shell string)
+ * - exec (code mode): nested `tools.exec_command({ cmd })` calls inside the script
+ */
+export function extractShellCommandTexts(
+  toolName: string,
+  invocationText: string,
+): string[] {
+  if (!invocationText.trim() || !isShellToolName(toolName)) {
+    return [];
+  }
+
+  if (toolName === "exec_command") {
+    const command = extractExecCommandText(invocationText);
+    return command ? [command] : [];
+  }
+
+  return extractNestedExecCommandTexts(invocationText);
+}
+
+export function shellCommandTextFromInvocation(
+  toolName: string,
+  invocationText: string,
+): string {
+  return extractShellCommandTexts(toolName, invocationText).join(" && ");
 }
 
 export function parseExecCommand(commandText: string): ParsedExecCommand[] {
@@ -333,6 +368,19 @@ export function parseExecCommand(commandText: string): ParsedExecCommand[] {
           cmd: normalized,
         },
       ];
+}
+
+export function parseShellToolCommands(
+  toolName: string,
+  commandText: string,
+): ParsedExecCommand[] {
+  if (!isShellToolName(toolName) || !commandText.trim()) {
+    return [];
+  }
+
+  // Multi-command code-mode scripts are joined with " && " for display; re-split
+  // by parsing each original segment via the joined shell form.
+  return parseExecCommand(commandText);
 }
 
 export function isExplorationCommand(

@@ -4,9 +4,10 @@ import type {
   TimelineEvent,
 } from "@shared/types";
 import {
-  extractExecCommandText,
   isExplorationCommand,
-  parseExecCommand,
+  isShellToolName,
+  parseShellToolCommands,
+  shellCommandTextFromInvocation,
 } from "./commandSemantics";
 import { commandTextFromResult, toolPreview } from "./toolPresentation";
 import type {
@@ -124,7 +125,7 @@ function resolveParsedCommands(
   commandText: string,
   parsedCommands: ParsedCommand[] | undefined,
 ): ParsedCommand[] {
-  if (toolName !== "exec_command") {
+  if (!isShellToolName(toolName)) {
     return [];
   }
 
@@ -132,7 +133,7 @@ function resolveParsedCommands(
     return parsedCommands;
   }
 
-  return commandText ? parseExecCommand(commandText) : [];
+  return commandText ? parseShellToolCommands(toolName, commandText) : [];
 }
 
 function hydrateToolCommand(
@@ -142,7 +143,7 @@ function hydrateToolCommand(
 ): void {
   if (commandText && tool.commandText !== commandText) {
     tool.commandText = commandText;
-    if (tool.name === "exec_command") {
+    if (isShellToolName(tool.name)) {
       tool.preview = commandText;
     }
   }
@@ -262,7 +263,7 @@ function ensurePatchRun(
 
 function isExplorationTool(tool: ToolRunView): boolean {
   return (
-    tool.name === "exec_command" &&
+    isShellToolName(tool.name) &&
     tool.parsedCommands.length > 0 &&
     tool.parsedCommands.every(isExplorationCommand)
   );
@@ -324,7 +325,9 @@ function appendExplorationRun(turn: MutableTurn, tool: ToolRunView): void {
 }
 
 function placeToolRun(turn: MutableTurn, tool: ToolRunView): void {
-  if (tool.name === "exec_command" && !tool.commandText && !tool.result) {
+  // Shell tools without extractable commands stay pending until result arrives
+  // (code-mode `exec` may stream before we can classify nested cmds).
+  if (isShellToolName(tool.name) && !tool.commandText && !tool.result) {
     return;
   }
 
@@ -353,7 +356,7 @@ function findExecToolByProcessId(
   processId: string,
 ): ToolRunView | null {
   for (const tool of turn.toolMap.values()) {
-    if (tool.name === "exec_command" && tool.result?.processId === processId) {
+    if (isShellToolName(tool.name) && tool.result?.processId === processId) {
       return tool;
     }
   }
@@ -592,10 +595,10 @@ export function buildTurnCards(events: TimelineEvent[]): TurnCardView[] {
         name: event.tool.name,
         preview: toolPreview(event.tool.name, event.tool.argumentsText),
         invocationText: event.tool.argumentsText,
-        commandText:
-          event.tool.name === "exec_command"
-            ? extractExecCommandText(event.tool.argumentsText)
-            : "",
+        commandText: shellCommandTextFromInvocation(
+          event.tool.name,
+          event.tool.argumentsText,
+        ),
         parsedCommands: event.tool.parsedCommands,
         toolType: event.tool.toolType,
         status: event.tool.status,
