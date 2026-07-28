@@ -1,7 +1,7 @@
 import type { ToolResultPayload } from "@shared/types";
 import {
   isShellToolName,
-  shellCommandTextFromInvocation,
+  shellToolDisplayTextFromInvocation,
 } from "./commandSemantics";
 import { compactWhitespace, stripShellWrapper } from "./shellParsing";
 
@@ -50,7 +50,7 @@ export function toolPreview(name: string, invocationText: string): string {
   }
 
   if (isShellToolName(name)) {
-    const commandText = shellCommandTextFromInvocation(name, invocationText);
+    const commandText = shellToolDisplayTextFromInvocation(name, invocationText);
     if (commandText) {
       return commandText;
     }

@@ -4,10 +4,11 @@ import type {
   TimelineEvent,
 } from "@shared/types";
 import {
+  extractShellCommandTexts,
   isExplorationCommand,
   isShellToolName,
   parseShellToolCommands,
-  shellCommandTextFromInvocation,
+  shellToolDisplayTextFromInvocation,
 } from "./commandSemantics";
 import { commandTextFromResult, toolPreview } from "./toolPresentation";
 import type {
@@ -124,6 +125,7 @@ function resolveParsedCommands(
   toolName: string,
   commandText: string,
   parsedCommands: ParsedCommand[] | undefined,
+  invocationText = "",
 ): ParsedCommand[] {
   if (!isShellToolName(toolName)) {
     return [];
@@ -131,6 +133,15 @@ function resolveParsedCommands(
 
   if (parsedCommands && parsedCommands.length > 0) {
     return parsedCommands;
+  }
+
+  // Prefer real nested shell cmds from the invocation over display-only text.
+  if (toolName === "exec" && invocationText) {
+    const shellCommands = extractShellCommandTexts(toolName, invocationText);
+    if (shellCommands.length > 0) {
+      return parseShellToolCommands(toolName, shellCommands.join(" && "));
+    }
+    return [];
   }
 
   return commandText ? parseShellToolCommands(toolName, commandText) : [];
@@ -152,6 +163,7 @@ function hydrateToolCommand(
     tool.name,
     tool.commandText,
     parsedCommands,
+    tool.invocationText,
   );
 }
 
@@ -222,6 +234,7 @@ function ensureToolRun(
       fallback.name ?? "tool",
       fallback.commandText ?? "",
       fallback.parsedCommands,
+      fallback.invocationText ?? "",
     ),
     toolType: fallback.toolType ?? "unknown",
     status: fallback.status,
@@ -325,9 +338,13 @@ function appendExplorationRun(turn: MutableTurn, tool: ToolRunView): void {
 }
 
 function placeToolRun(turn: MutableTurn, tool: ToolRunView): void {
-  // Shell tools without extractable commands stay pending until result arrives
-  // (code-mode `exec` may stream before we can classify nested cmds).
-  if (isShellToolName(tool.name) && !tool.commandText && !tool.result) {
+  // Shell tools without a displayable summary stay pending until result arrives.
+  if (
+    isShellToolName(tool.name) &&
+    !tool.commandText &&
+    !tool.preview &&
+    !tool.result
+  ) {
     return;
   }
 
@@ -590,15 +607,17 @@ export function buildTurnCards(events: TimelineEvent[]): TurnCardView[] {
         continue;
       }
 
+      const displayText = shellToolDisplayTextFromInvocation(
+        event.tool.name,
+        event.tool.argumentsText,
+      );
       const tool = ensureToolRun(current, event.callId, {
         ts: event.ts,
         name: event.tool.name,
-        preview: toolPreview(event.tool.name, event.tool.argumentsText),
+        preview:
+          displayText || toolPreview(event.tool.name, event.tool.argumentsText),
         invocationText: event.tool.argumentsText,
-        commandText: shellCommandTextFromInvocation(
-          event.tool.name,
-          event.tool.argumentsText,
-        ),
+        commandText: displayText,
         parsedCommands: event.tool.parsedCommands,
         toolType: event.tool.toolType,
         status: event.tool.status,

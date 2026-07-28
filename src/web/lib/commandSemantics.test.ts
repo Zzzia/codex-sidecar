@@ -97,3 +97,153 @@ text(result.output);`;
     "sed -n '1,240p' /tmp/foo.md",
   );
 });
+
+test("extractNestedExecCommandTexts keeps template-literal cmds with placeholders", () => {
+  const script = `const specs = [
+  {repo:"lighten-agent-runtime", branches:["master","codex/code-agent-base-runtime"]},
+  {repo:"toolkit-center", branches:["master","codex/code-agent-control-plane"]}
+];
+const results = [];
+for (const spec of specs) {
+  const refspecs = spec.branches.map(b => \`+refs/heads/\${b}:refs/remotes/origin/\${b}\`).join(" ");
+  const r = await tools.exec_command({
+    cmd: \`git fetch origin \${refspecs}\`,
+    workdir: \`/home/zia/project/AgentHubProject/\${spec.repo}\`,
+    yield_time_ms: 30000,
+    max_output_tokens: 12000
+  });
+  results.push({repo:spec.repo, output:r.output});
+}`;
+
+  assert.deepEqual(extractNestedExecCommandTexts(script), [
+    "git fetch origin ${refspecs}",
+  ]);
+});
+
+test("extractNestedExecCommandTexts resolves cmd references from nearby specs objects", () => {
+  const script = `const jobs = [
+  {
+    name: "runtime",
+    workdir: "/tmp/runtime",
+    cmd: "git status --short"
+  },
+  {
+    name: "toolkit",
+    workdir: "/tmp/toolkit",
+    cmd: "rg -n CodeAgent src | head -n 40"
+  }
+];
+for (const j of jobs) {
+  await tools.exec_command({
+    cmd: j.cmd,
+    workdir: j.workdir,
+    yield_time_ms: 10000
+  });
+}`;
+
+  assert.deepEqual(extractNestedExecCommandTexts(script), [
+    "git status --short",
+    "rg -n CodeAgent src | head -n 40",
+  ]);
+});
+
+test("extractNestedExecCommandTexts supports functions.exec_command array entries", () => {
+  const script = `const calls = [
+  ["functions.exec_command", {
+    cmd: "sed -n '1,240p' pyproject.toml",
+    workdir: "/tmp/orch",
+    yield_time_ms: 10000
+  }],
+  ["functions.exec_command", {
+    cmd: "rg -n CodeAgent src",
+    workdir: "/tmp/runtime"
+  }]
+];`;
+
+  assert.deepEqual(extractNestedExecCommandTexts(script), [
+    "sed -n '1,240p' pyproject.toml",
+    "rg -n CodeAgent src",
+  ]);
+});
+
+test("extractNestedExecCommandTexts accepts JSON-style object argument", () => {
+  const script =
+    'const r = await tools.exec_command({"cmd":"git status --short && rg -n foo","workdir":"/tmp"}); text(r.output);';
+
+  assert.deepEqual(extractNestedExecCommandTexts(script), [
+    "git status --short && rg -n foo",
+  ]);
+});
+
+test("extractNestedExecCommandTexts resolves tools.exec_command(args) from call table", () => {
+  const script = `const calls = [
+  ["tc-status", {cmd:"git status --short",workdir:"/tmp/tc",yield_time_ms:10000}],
+  ["runtime-status", {cmd:"rg -n CodeAgent src",workdir:"/tmp/rt",yield_time_ms:10000}]
+];
+const out = await Promise.all(calls.map(async ([name,args]) => {
+  const r = await tools.exec_command(args);
+  return {name,...r};
+}));
+for (const r of out) text(\`## \${r.name}\\n\${r.output}\`);`;
+
+  assert.deepEqual(extractNestedExecCommandTexts(script), [
+    "git status --short",
+    "rg -n CodeAgent src",
+  ]);
+});
+
+test("extractNestedExecCommandTexts resolves shorthand {cmd} from label/command tuples", () => {
+  const script = `const pushes = [
+  ["skill_studio","git push origin HEAD:jiangzilai/dual-agent-kind"],
+  ["lighten-agent-runtime","git push origin HEAD:jiangzilai/code-agent-runtime-ppt-e2e-test"],
+  ["lighten-agent-orchestrator","git push origin HEAD:jiangzilai/code-agent-lifecycle-ppt-e2e-master"],
+  ["toolkit-center","git push origin HEAD:jiangzilai/code-agent-control-plane-ppt-e2e-test"]
+];
+const base="/home/zia/project/AgentHubProject";
+const results=await Promise.all(pushes.map(([repo,cmd])=>tools.exec_command({
+  cmd,
+  workdir:\`\${base}/\${repo}\`,
+  yield_time_ms:30000,
+  max_output_tokens:8000
+})));
+for(let i=0;i<pushes.length;i++) text(JSON.stringify({repo:pushes[i][0],exit_code:results[i].exit_code,output:results[i].output}));`;
+
+  assert.deepEqual(extractNestedExecCommandTexts(script), [
+    "git push origin HEAD:jiangzilai/dual-agent-kind",
+    "git push origin HEAD:jiangzilai/code-agent-runtime-ppt-e2e-test",
+    "git push origin HEAD:jiangzilai/code-agent-lifecycle-ppt-e2e-master",
+    "git push origin HEAD:jiangzilai/code-agent-control-plane-ppt-e2e-test",
+  ]);
+});
+
+test("extractNestedExecCommandTexts resolves shorthand {cmd} from string command maps", () => {
+  const script = `const root="/home/zia/project/AgentHubProject";
+const pushes={
+  "skill_studio":"git push origin HEAD:refs/heads/jiangzilai/dual-agent-kind",
+  "toolkit-center":"git push origin HEAD:refs/heads/jiangzilai/code-agent-control-plane-ppt-e2e-test"
+};
+const results=await Promise.all(Object.entries(pushes).map(async ([repo,cmd])=>{
+  const r=await tools.exec_command({cmd,workdir:\`\${root}/\${repo}\`,yield_time_ms:30000});
+  return {repo,...r};
+}));`;
+
+  assert.deepEqual(extractNestedExecCommandTexts(script), [
+    "git push origin HEAD:refs/heads/jiangzilai/dual-agent-kind",
+    "git push origin HEAD:refs/heads/jiangzilai/code-agent-control-plane-ppt-e2e-test",
+  ]);
+});
+
+test("shellToolDisplayTextFromInvocation summarizes write_stdin Ctrl-C sessions", async () => {
+  const { shellToolDisplayTextFromInvocation } = await import("./commandSemantics.js");
+  const script = `const results = await Promise.all([
+  tools.write_stdin({session_id:75736, chars:"\\u0003", yield_time_ms:1000, max_output_tokens:4000}),
+  tools.write_stdin({session_id:40445, chars:"\\u0003", yield_time_ms:1000, max_output_tokens:4000}),
+  tools.write_stdin({session_id:84883, chars:"\\u0003", yield_time_ms:1000, max_output_tokens:4000})
+]);
+for (const [i,r] of results.entries()) text(JSON.stringify({service:["skill_studio","toolkit","orchestrator"][i],exit_code:r.exit_code,output:r.output}));`;
+
+  assert.equal(
+    shellToolDisplayTextFromInvocation("exec", script),
+    "Ctrl-C · sessions 75736, 40445, 84883",
+  );
+});

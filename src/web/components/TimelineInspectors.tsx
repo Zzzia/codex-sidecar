@@ -24,8 +24,18 @@ import {
   summarizeExplorationStep,
 } from "./timelineHelpers";
 
-function toolLabel(name: string): string {
-  return name === "exec_command" || name === "exec" ? "Run" : name;
+function toolLabel(name: string, preview = ""): string {
+  if (name === "exec_command" || name === "exec") {
+    if (
+      preview.includes("Ctrl-") ||
+      preview.includes(" · session") ||
+      preview === "poll"
+    ) {
+      return "Interact";
+    }
+    return "Run";
+  }
+  return name;
 }
 
 function renderPageModal(content: ReactNode): ReactNode {
@@ -408,7 +418,9 @@ export function ToolDetailsModal({
       >
         <header className="tool-modal-header">
           <div className="tool-modal-title-wrap">
-            <div className="tool-modal-eyebrow">{toolLabel(tool.name)}</div>
+            <div className="tool-modal-eyebrow">
+              {toolLabel(tool.name, tool.preview)}
+            </div>
             <h3 title={tool.preview}>{tool.preview}</h3>
           </div>
           <button className="icon-button" onClick={onClose} title="Close">

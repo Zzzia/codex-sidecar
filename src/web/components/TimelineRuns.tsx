@@ -28,6 +28,14 @@ function isShellTool(name: string): boolean {
 
 function toolDisplayName(tool: ToolRunView): string {
   if (isShellTool(tool.name)) {
+    // Code-mode scripts that only poke background sessions via write_stdin.
+    if (
+      tool.preview.includes("Ctrl-") ||
+      tool.preview.includes(" · session") ||
+      tool.preview === "poll"
+    ) {
+      return "Interact";
+    }
     return "Run";
   }
   return tool.name;

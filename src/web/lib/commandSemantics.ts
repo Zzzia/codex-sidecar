@@ -1,6 +1,10 @@
 import type { ParsedCommand } from "@shared/types";
 import { extractNestedExecCommandTexts } from "./codeModeExec";
 import {
+  extractNestedWriteStdinActions,
+  writeStdinActionsPreview,
+} from "./codeModeWriteStdin";
+import {
   commandBasename,
   compactWhitespace,
   positionalOperands,
@@ -13,6 +17,11 @@ import {
 
 export type ParsedExecCommand = ParsedCommand;
 export { extractNestedExecCommandTexts } from "./codeModeExec";
+export {
+  extractNestedWriteStdinActions,
+  formatWriteStdinChars,
+  writeStdinActionsPreview,
+} from "./codeModeWriteStdin";
 
 function tryParseJson(text: string): Record<string, unknown> | null {
   try {
@@ -321,6 +330,9 @@ export function extractExecCommandText(invocationText: string): string {
  * Canonical extraction of shell command texts for shell-capable tools.
  * - exec_command: JSON `{ cmd }` (or raw shell string)
  * - exec (code mode): nested `tools.exec_command({ cmd })` calls inside the script
+ *
+ * Does not include write_stdin interactions — those are display-only via
+ * {@link shellToolDisplayTextFromInvocation}.
  */
 export function extractShellCommandTexts(
   toolName: string,
@@ -343,6 +355,37 @@ export function shellCommandTextFromInvocation(
   invocationText: string,
 ): string {
   return extractShellCommandTexts(toolName, invocationText).join(" && ");
+}
+
+/**
+ * Best-effort human summary for a code-mode `exec` freeform script.
+ * Prefers nested shell cmds; falls back to write_stdin interaction summary.
+ */
+export function summarizeCodeModeExecScript(scriptText: string): string {
+  const shellCommands = extractNestedExecCommandTexts(scriptText);
+  if (shellCommands.length > 0) {
+    return shellCommands.join(" && ");
+  }
+  return writeStdinActionsPreview(extractNestedWriteStdinActions(scriptText));
+}
+
+/**
+ * Human-readable summary for shell-capable tools, including code-mode scripts
+ * that only interact with background sessions via write_stdin.
+ */
+export function shellToolDisplayTextFromInvocation(
+  toolName: string,
+  invocationText: string,
+): string {
+  if (!invocationText.trim() || !isShellToolName(toolName)) {
+    return "";
+  }
+
+  if (toolName === "exec_command") {
+    return extractExecCommandText(invocationText);
+  }
+
+  return summarizeCodeModeExecScript(invocationText);
 }
 
 export function parseExecCommand(commandText: string): ParsedExecCommand[] {
@@ -378,9 +421,26 @@ export function parseShellToolCommands(
     return [];
   }
 
+  // Only classify real shell command text. Display-only summaries such as
+  // write_stdin "Ctrl-C · sessions …" must not enter exploration parsing.
+  if (toolName === "exec" && !looksLikeShellCommandText(commandText)) {
+    return [];
+  }
+
   // Multi-command code-mode scripts are joined with " && " for display; re-split
   // by parsing each original segment via the joined shell form.
   return parseExecCommand(commandText);
+}
+
+function looksLikeShellCommandText(commandText: string): boolean {
+  // write_stdin summaries are prose labels, not shell argv text.
+  if (commandText.includes(" · session") || commandText.includes(" · sessions ")) {
+    return false;
+  }
+  if (commandText === "Ctrl-C" || commandText === "Ctrl-D" || commandText === "poll") {
+    return false;
+  }
+  return true;
 }
 
 export function isExplorationCommand(

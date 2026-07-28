@@ -190,6 +190,94 @@ test("buildTurnCards coalesces exploratory exec commands into one exploration bl
   assert.equal(cards[0].blocks[0].items[1].tools.length, 2);
 });
 
+test("buildTurnCards summarizes code-mode write_stdin scripts as Interact preview", () => {
+  const events: TimelineEvent[] = [
+    {
+      id: "u1",
+      ts: "2026-04-22T08:00:01.000Z",
+      kind: "message",
+      role: "user",
+      text: "停掉后台进程",
+      isPlan: false,
+    },
+    {
+      id: "c1",
+      ts: "2026-04-22T08:00:02.000Z",
+      kind: "tool_call",
+      callId: "call-stdin",
+      tool: {
+        name: "exec",
+        argumentsText: `const results = await Promise.all([
+  tools.write_stdin({session_id:75736, chars:"\\u0003", yield_time_ms:1000, max_output_tokens:4000}),
+  tools.write_stdin({session_id:40445, chars:"\\u0003", yield_time_ms:1000, max_output_tokens:4000}),
+  tools.write_stdin({session_id:84883, chars:"\\u0003", yield_time_ms:1000, max_output_tokens:4000})
+]);
+for (const [i,r] of results.entries()) text(JSON.stringify({service:["skill_studio","toolkit","orchestrator"][i],exit_code:r.exit_code,output:r.output}));`,
+        toolType: "custom_tool_call",
+      },
+    },
+  ];
+
+  const cards = buildTurnCards(events);
+  assert.equal(cards.length, 1);
+  assert.equal(cards[0]?.blocks[0]?.type, "tool_runs");
+  if (cards[0]?.blocks[0]?.type !== "tool_runs") {
+    assert.fail("expected tool_runs for write_stdin interactions");
+  }
+  const tool = cards[0].blocks[0].items[0];
+  assert.equal(tool?.name, "exec");
+  assert.equal(tool?.preview, "Ctrl-C · sessions 75736, 40445, 84883");
+  assert.doesNotMatch(tool?.preview ?? "", /const results/);
+  assert.equal(tool?.parsedCommands.length, 0);
+});
+
+test("buildTurnCards shows template-literal code-mode cmds instead of raw script", () => {
+  const events: TimelineEvent[] = [
+    {
+      id: "u1",
+      ts: "2026-04-22T08:00:01.000Z",
+      kind: "message",
+      role: "user",
+      text: "拉一下远端分支",
+      isPlan: false,
+    },
+    {
+      id: "c1",
+      ts: "2026-04-22T08:00:02.000Z",
+      kind: "tool_call",
+      callId: "call-specs",
+      tool: {
+        name: "exec",
+        argumentsText: `const specs = [
+  {repo:"lighten-agent-runtime", branches:["master","codex/code-agent-base-runtime"]},
+  {repo:".", branches:["master","feature/agentrunner-redis-state"]}
+];
+for (const spec of specs) {
+  const refspecs = spec.branches.map(b => \`+refs/heads/\${b}:refs/remotes/origin/\${b}\`).join(" ");
+  await tools.exec_command({
+    cmd: \`git fetch origin \${refspecs}\`,
+    workdir: \`/home/zia/project/AgentHubProject/\${spec.repo}\`,
+    yield_time_ms: 30000
+  });
+}`,
+        toolType: "custom_tool_call",
+      },
+    },
+  ];
+
+  const cards = buildTurnCards(events);
+  assert.equal(cards.length, 1);
+  assert.equal(cards[0]?.blocks[0]?.type, "tool_runs");
+  if (cards[0]?.blocks[0]?.type !== "tool_runs") {
+    assert.fail("expected tool_runs for non-exploration git fetch");
+  }
+  const tool = cards[0].blocks[0].items[0];
+  assert.equal(tool?.name, "exec");
+  assert.equal(tool?.preview, "git fetch origin ${refspecs}");
+  assert.equal(tool?.commandText, "git fetch origin ${refspecs}");
+  assert.doesNotMatch(tool?.preview ?? "", /const specs/);
+});
+
 test("buildTurnCards classifies code-mode exec scripts as exploration reads/searches", () => {
   const events: TimelineEvent[] = [
     {
