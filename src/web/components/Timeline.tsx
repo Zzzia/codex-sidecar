@@ -22,6 +22,13 @@ import {
   type TimelineScrollAnchor,
 } from "./timelineScrollAnchor";
 import {
+  distanceToBottom,
+  isNearBottom,
+  isScrollTopDecreased,
+  nextStickToBottom,
+  stickAfterScroll,
+} from "./timelineStickToBottom";
+import {
   TurnCard,
   type TimelineInspectTarget,
 } from "./TimelineTurnCard";
@@ -29,11 +36,14 @@ import {
 type TimelineScrollBehavior = "auto" | "smooth";
 
 function readTimelineScrollPosition(scrollerNode: HTMLElement) {
-  const distanceToBottom =
-    scrollerNode.scrollHeight - scrollerNode.clientHeight - scrollerNode.scrollTop;
+  const distance = distanceToBottom(
+    scrollerNode.scrollHeight,
+    scrollerNode.clientHeight,
+    scrollerNode.scrollTop,
+  );
   return {
     atTop: scrollerNode.scrollTop <= 8,
-    atBottom: distanceToBottom <= 8,
+    atBottom: isNearBottom(distance),
   };
 }
 
@@ -59,27 +69,33 @@ export function Timeline({
   const scrollerRef = useRef<HTMLElement | null>(null);
   const [scrollerNode, setScrollerNode] = useState<HTMLElement | null>(null);
   const didPrimeScrollRef = useRef(false);
-  const followScrollPending = useRef(false);
+  const programmaticScrollRef = useRef(false);
+  const userIntentScrollRef = useRef(false);
+  const lastScrollTopRef = useRef(0);
   const visibleStartIndexRef = useRef(0);
   const scrollAnchorRef = useRef<TimelineScrollAnchor | null>(null);
-  const followLatestRef = useRef(true);
+  const stickToBottomRef = useRef(true);
   const [isAtTop, setIsAtTop] = useState(true);
-  const [isAtBottom, setIsAtBottom] = useState(true);
-  const [followLatest, setFollowLatest] = useState(true);
+  const [stickToBottom, setStickToBottom] = useState(true);
   const [selectedItem, setSelectedItem] = useState<TimelineInspectTarget | null>(null);
   const initialBottomIndex =
     cards.length > 0
       ? { index: cards.length - 1, align: "end" as const }
       : undefined;
 
+  const applyStick = (next: boolean) => {
+    stickToBottomRef.current = next;
+    setStickToBottom(next);
+  };
+
   useEffect(() => {
     didPrimeScrollRef.current = false;
-    followScrollPending.current = false;
+    programmaticScrollRef.current = false;
+    userIntentScrollRef.current = false;
+    lastScrollTopRef.current = 0;
     scrollAnchorRef.current = null;
-    followLatestRef.current = true;
+    applyStick(nextStickToBottom(false, "reset_thread"));
     setIsAtTop(true);
-    setIsAtBottom(true);
-    setFollowLatest(true);
     setSelectedItem(null);
   }, [threadId]);
 
@@ -88,7 +104,8 @@ export function Timeline({
       return;
     }
 
-    followScrollPending.current = true;
+    programmaticScrollRef.current = true;
+    userIntentScrollRef.current = false;
     if (scrollerRef.current) {
       scrollerRef.current.scrollTo({
         top: scrollerRef.current.scrollHeight,
@@ -105,11 +122,7 @@ export function Timeline({
   };
 
   useEffect(() => {
-    followLatestRef.current = followLatest;
-  }, [followLatest]);
-
-  useEffect(() => {
-    if (!followLatest || cards.length === 0 || events.length === 0) {
+    if (!stickToBottom || cards.length === 0 || events.length === 0) {
       return;
     }
 
@@ -123,7 +136,7 @@ export function Timeline({
     return () => {
       cancelAnimationFrame(frame);
     };
-  }, [cards.length, events.length, followLatest]);
+  }, [cards.length, events.length, stickToBottom]);
 
   useEffect(() => {
     if (!scrollerNode) {
@@ -133,21 +146,32 @@ export function Timeline({
     let userScrollFrame: number | null = null;
 
     const syncScrollState = () => {
+      const previousScrollTop = lastScrollTopRef.current;
+      const scrollTop = scrollerNode.scrollTop;
+      lastScrollTopRef.current = scrollTop;
+
       const { atTop, atBottom } = readTimelineScrollPosition(scrollerNode);
       scrollAnchorRef.current = readTimelineScrollAnchor(scrollerNode);
-
       setIsAtTop(atTop);
-      setIsAtBottom(atBottom);
 
-      if (!atBottom && followScrollPending.current) {
-        return;
+      const userIntent =
+        userIntentScrollRef.current ||
+        isScrollTopDecreased(previousScrollTop, scrollTop);
+
+      const decision = stickAfterScroll({
+        stick: stickToBottomRef.current,
+        atBottom,
+        programmatic: programmaticScrollRef.current,
+        userIntent,
+      });
+
+      programmaticScrollRef.current = decision.programmatic;
+      // Consume one-shot user intent once scroll has been evaluated.
+      userIntentScrollRef.current = false;
+
+      if (decision.stick !== stickToBottomRef.current) {
+        applyStick(decision.stick);
       }
-
-      if (atBottom) {
-        followScrollPending.current = false;
-      }
-
-      setFollowLatest(atBottom);
     };
 
     const queueScrollStateSync = () => {
@@ -160,17 +184,30 @@ export function Timeline({
       });
     };
 
-    const stopPendingProgrammaticScroll = () => {
-      followScrollPending.current = false;
+    const markUserScrollIntent = () => {
+      programmaticScrollRef.current = false;
+      userIntentScrollRef.current = true;
       queueScrollStateSync();
     };
 
+    // Scrollbar interactions target the scroller element itself, not children.
+    const markScrollbarPointerIntent = (event: PointerEvent) => {
+      if (event.target !== scrollerNode) {
+        return;
+      }
+      markUserScrollIntent();
+    };
+
+    lastScrollTopRef.current = scrollerNode.scrollTop;
     const frame = requestAnimationFrame(syncScrollState);
     scrollerNode.addEventListener("scroll", syncScrollState, { passive: true });
-    scrollerNode.addEventListener("wheel", stopPendingProgrammaticScroll, {
+    scrollerNode.addEventListener("wheel", markUserScrollIntent, {
       passive: true,
     });
-    scrollerNode.addEventListener("touchmove", stopPendingProgrammaticScroll, {
+    scrollerNode.addEventListener("touchmove", markUserScrollIntent, {
+      passive: true,
+    });
+    scrollerNode.addEventListener("pointerdown", markScrollbarPointerIntent, {
       passive: true,
     });
     window.addEventListener("resize", syncScrollState);
@@ -180,8 +217,9 @@ export function Timeline({
         cancelAnimationFrame(userScrollFrame);
       }
       scrollerNode.removeEventListener("scroll", syncScrollState);
-      scrollerNode.removeEventListener("wheel", stopPendingProgrammaticScroll);
-      scrollerNode.removeEventListener("touchmove", stopPendingProgrammaticScroll);
+      scrollerNode.removeEventListener("wheel", markUserScrollIntent);
+      scrollerNode.removeEventListener("touchmove", markUserScrollIntent);
+      scrollerNode.removeEventListener("pointerdown", markScrollbarPointerIntent);
       window.removeEventListener("resize", syncScrollState);
     };
   }, [scrollerNode, cards.length]);
@@ -208,13 +246,16 @@ export function Timeline({
     const syncPositionAfterResize = () => {
       const { atTop, atBottom } = readTimelineScrollPosition(scrollerNode);
       scrollAnchorRef.current = readTimelineScrollAnchor(scrollerNode);
+      lastScrollTopRef.current = scrollerNode.scrollTop;
       setIsAtTop(atTop);
-      setIsAtBottom(atBottom);
+
+      // Resize / content growth never clears stick intent.
       if (atBottom) {
-        followScrollPending.current = false;
-      }
-      if (!followScrollPending.current) {
-        setFollowLatest(atBottom);
+        programmaticScrollRef.current = false;
+        userIntentScrollRef.current = false;
+        if (!stickToBottomRef.current) {
+          applyStick(nextStickToBottom(false, "enter_by_arrive"));
+        }
       }
     };
 
@@ -229,7 +270,9 @@ export function Timeline({
       frame = window.requestAnimationFrame(() => {
         frame = null;
 
-        if (anchor.atBottom || followLatestRef.current) {
+        if (anchor.atBottom || stickToBottomRef.current) {
+          programmaticScrollRef.current = true;
+          userIntentScrollRef.current = false;
           scrollerNode.scrollTop = scrollerNode.scrollHeight;
           syncPositionAfterResize();
           return;
@@ -246,7 +289,7 @@ export function Timeline({
 
         settleFrame = window.requestAnimationFrame(() => {
           settleFrame = null;
-          if (!followLatestRef.current) {
+          if (!stickToBottomRef.current) {
             restoreTimelineScrollAnchor(scrollerNode, anchor);
           }
           syncPositionAfterResize();
@@ -296,7 +339,7 @@ export function Timeline({
     if (cards.length === 0) {
       return;
     }
-    setFollowLatest(true);
+    applyStick(nextStickToBottom(stickToBottomRef.current, "enter_by_jump"));
     didPrimeScrollRef.current = true;
     scrollTimelineToBottom("auto");
   };
@@ -306,8 +349,9 @@ export function Timeline({
       return;
     }
 
-    followScrollPending.current = false;
-    setFollowLatest(false);
+    programmaticScrollRef.current = false;
+    userIntentScrollRef.current = true;
+    applyStick(nextStickToBottom(stickToBottomRef.current, "leave_by_jump_top"));
     const currentIndex = scrollerRef.current
       ? findCurrentTurnCardIndex(scrollerRef.current)
       : visibleStartIndexRef.current;
@@ -327,7 +371,7 @@ export function Timeline({
         alignToBottom
         components={{ Footer: TimelineFooterSpacer }}
         computeItemKey={(_, card) => card.id}
-        followOutput={followLatest ? "smooth" : false}
+        followOutput={stickToBottom ? "smooth" : false}
         initialTopMostItemIndex={initialBottomIndex}
         rangeChanged={(range) => {
           visibleStartIndexRef.current = range.startIndex;
@@ -358,7 +402,7 @@ export function Timeline({
         )}
       />
 
-      {!isAtTop || !isAtBottom ? (
+      {!isAtTop || !stickToBottom ? (
         <div className="timeline-jump-stack">
           {!isAtTop ? (
             <button
@@ -370,7 +414,7 @@ export function Timeline({
             </button>
           ) : null}
 
-          {!isAtBottom ? (
+          {!stickToBottom ? (
             <button
               className="timeline-jump-button"
               onClick={jumpToBottom}

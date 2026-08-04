@@ -1,4 +1,5 @@
 import type { ThreadStatus, TimelineEvent } from "@shared/types";
+import { extractNestedUpdatePlans } from "./codeModeUpdatePlan";
 
 export type ProgressStepStatus = "pending" | "in_progress" | "completed";
 
@@ -71,24 +72,69 @@ function parsePlanItems(value: unknown): ProgressStepView[] {
     .filter((entry): entry is ProgressStepView => Boolean(entry));
 }
 
-function parseUpdatePlanEvent(event: ToolCallEvent): ThreadProgressView | null {
+function progressFromPlanPayload(options: {
+  ts: string;
+  explanation: string;
+  items: ProgressStepView[];
+}): ThreadProgressView | null {
+  if (options.items.length === 0) {
+    return null;
+  }
+
+  return {
+    ts: options.ts,
+    explanation: options.explanation,
+    items: options.items,
+    source: "update_plan",
+  };
+}
+
+function parseClassicUpdatePlanEvent(
+  event: ToolCallEvent,
+): ThreadProgressView | null {
   if (event.tool.name !== "update_plan") {
     return null;
   }
 
   const parsed = tryParseJson(event.tool.argumentsText);
-  const items = parsePlanItems(parsed?.plan);
-  if (items.length === 0) {
-    return null;
-  }
-
-  return {
+  return progressFromPlanPayload({
     ts: event.ts,
     explanation:
       typeof parsed?.explanation === "string" ? parsed.explanation.trim() : "",
-    items,
-    source: "update_plan",
-  };
+    items: parsePlanItems(parsed?.plan),
+  });
+}
+
+function parseCodeModeUpdatePlanEvent(
+  event: ToolCallEvent,
+): ThreadProgressView | null {
+  // Only freeform code-mode `exec` scripts nest tools.update_plan(...).
+  if (event.tool.name !== "exec") {
+    return null;
+  }
+
+  const nested = extractNestedUpdatePlans(event.tool.argumentsText);
+  if (nested.length === 0) {
+    return null;
+  }
+
+  // One script may update the plan more than once; keep the last snapshot.
+  const latest = nested[nested.length - 1];
+  if (!latest) {
+    return null;
+  }
+
+  return progressFromPlanPayload({
+    ts: event.ts,
+    explanation: latest.explanation,
+    items: latest.items,
+  });
+}
+
+function parseUpdatePlanEvent(event: ToolCallEvent): ThreadProgressView | null {
+  return (
+    parseClassicUpdatePlanEvent(event) ?? parseCodeModeUpdatePlanEvent(event)
+  );
 }
 
 function findLatestStatusEvent(
@@ -145,7 +191,6 @@ export function extractThreadProgress(
       if (parsed) {
         latestPlan = parsed;
       }
-      continue;
     }
   }
 

@@ -470,6 +470,65 @@ test("buildTurnCards renders assistant proposed plans but skips update_plan in t
   assert.equal(cards[0]?.blocks[1]?.type, "assistant_markdown");
 });
 
+test("buildTurnCards hides progress-only code-mode update_plan scripts", () => {
+  const events: TimelineEvent[] = [
+    {
+      id: "u1",
+      ts: "2026-08-04T14:00:00.000Z",
+      kind: "message",
+      role: "user",
+      text: "继续",
+      isPlan: false,
+    },
+    {
+      id: "exec-plan",
+      ts: "2026-08-04T14:00:01.000Z",
+      kind: "tool_call",
+      callId: "call-exec-plan",
+      tool: {
+        name: "exec",
+        argumentsText: `const result = await tools.update_plan({
+  plan: [
+    { step: "完整读取四个 Skill", status: "completed" },
+    { step: "给出推荐流程", status: "in_progress" }
+  ]
+});
+text(result);`,
+        toolType: "custom_tool_call",
+      },
+    },
+    {
+      id: "exec-plan-result",
+      ts: "2026-08-04T14:00:02.000Z",
+      kind: "tool_result",
+      callId: "call-exec-plan",
+      name: "exec",
+      result: {
+        toolType: "custom_tool_call_output",
+        title: "exec",
+        success: true,
+        exitCode: 0,
+        outputText: "Plan updated",
+        stderrText: "",
+        raw: null,
+      },
+    },
+    {
+      id: "m1",
+      ts: "2026-08-04T14:00:03.000Z",
+      kind: "message",
+      role: "assistant",
+      text: "继续推进",
+      isPlan: false,
+    },
+  ];
+
+  const cards = buildTurnCards(events);
+  assert.equal(cards.length, 1);
+  assert.equal(cards[0]?.blocks.length, 1);
+  assert.equal(cards[0]?.blocks[0]?.type, "assistant_markdown");
+});
+
 test("buildTurnCards renders context compaction as a merged status block", () => {
   const events: TimelineEvent[] = [
     {

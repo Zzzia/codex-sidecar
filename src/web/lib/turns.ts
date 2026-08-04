@@ -3,7 +3,9 @@ import type {
   ThreadStatus,
   TimelineEvent,
 } from "@shared/types";
+import { isUpdatePlanOnlyCodeModeScript } from "./codeModeUpdatePlan";
 import {
+  extractNestedWriteStdinActions,
   extractShellCommandTexts,
   isExplorationCommand,
   isShellToolName,
@@ -599,6 +601,18 @@ export function buildTurnCards(events: TimelineEvent[]): TurnCardView[] {
         continue;
       }
 
+      if (event.tool.name === "exec") {
+        const script = event.tool.argumentsText;
+        const hasNestedShellOrWriteWork =
+          extractShellCommandTexts("exec", script).length > 0 ||
+          extractNestedWriteStdinActions(script).length > 0;
+        if (isUpdatePlanOnlyCodeModeScript(script, hasNestedShellOrWriteWork)) {
+          // Progress-only code-mode scripts stay out of the timeline body.
+          // extractThreadProgress still reads tools.update_plan from the raw event.
+          continue;
+        }
+      }
+
       if (event.tool.name === "apply_patch") {
         ensurePatchRun(current, event.callId, {
           ts: event.ts,
@@ -629,6 +643,14 @@ export function buildTurnCards(events: TimelineEvent[]): TurnCardView[] {
     if (event.kind === "tool_result") {
       if (event.name === "update_plan") {
         continue;
+      }
+
+      if (event.name === "exec") {
+        const existing = current.toolMap.get(event.callId);
+        if (!existing) {
+          // Matching tool_call was a progress-only update_plan script.
+          continue;
+        }
       }
 
       if (event.name === "write_stdin") {

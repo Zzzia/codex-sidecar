@@ -1,3 +1,5 @@
+import { BOTTOM_DISTANCE_THRESHOLD } from "./timelineStickToBottom";
+
 export interface TimelineScrollAnchor {
   cardId: string;
   cardIndex: number;
@@ -6,7 +8,6 @@ export interface TimelineScrollAnchor {
 }
 
 const VIEWPORT_EDGE_PADDING = 8;
-const BOTTOM_DISTANCE_THRESHOLD = 8;
 
 function listTurnCards(scroller: HTMLElement): HTMLElement[] {
   return Array.from(scroller.querySelectorAll<HTMLElement>(".turn-card"));
