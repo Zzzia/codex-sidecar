@@ -693,3 +693,17 @@ a {
     transform: rotate(360deg);
   }
 }
+
+/* Soft paint path: disable backdrop blur when GPU compositing is weak/unavailable. */
+html.soft-paint .tool-modal-backdrop,
+html.soft-paint .mermaid-preview-backdrop,
+html.soft-paint .mermaid-fullscreen-button,
+html.soft-paint .preview-modal-backdrop,
+html.soft-paint .project-sidebar,
+html.soft-paint .pane-suspend-overlay,
+html.soft-paint .copy-code-button,
+html.soft-paint .task-tray-bar,
+html.soft-paint .task-tray-panel {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}

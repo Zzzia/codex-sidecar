@@ -1,8 +1,9 @@
+import { memo } from "react";
 import type { ThreadStatus } from "@shared/types";
-import {
-  buildTurnCards,
-  type ExplorationStepView,
-  type ToolRunView,
+import type {
+  ExplorationStepView,
+  ToolRunView,
+  TurnCardView,
 } from "@web/lib/turns";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { CompactionRunList } from "./TimelineCompaction";
@@ -99,7 +100,7 @@ function TurnCardFooter({
   );
 }
 
-export function TurnCard({
+function TurnCardImpl({
   index,
   card,
   onInspectTool,
@@ -107,7 +108,7 @@ export function TurnCard({
   localFileContext,
 }: {
   index: number;
-  card: ReturnType<typeof buildTurnCards>[number];
+  card: TurnCardView;
   onInspectTool: (tool: ToolRunView) => void;
   onInspectExploration: (step: ExplorationStepView) => void;
   localFileContext: LocalFileContext | null;
@@ -199,3 +200,5 @@ export function TurnCard({
     </article>
   );
 }
+
+export const TurnCard = memo(TurnCardImpl);

@@ -263,3 +263,7 @@ This repository **is**:
 
 - A monitoring and reading workspace around local Codex CLI
 - A GUI that brings Markdown, tool calls, patches, and multi-project switching together
+
+## Known Limitations
+
+See [docs/known-limitations.md](docs/known-limitations.md) for deferred work and intentional trade-offs (including frontend performance follow-ups).

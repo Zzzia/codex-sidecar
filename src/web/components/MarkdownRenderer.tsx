@@ -1,5 +1,11 @@
-import { useState, type MouseEvent } from "react";
-import Markdown from "react-markdown";
+import {
+  memo,
+  useCallback,
+  useMemo,
+  useState,
+  type MouseEvent,
+} from "react";
+import Markdown, { type Components } from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import rehypeRaw from "rehype-raw";
 import remarkBreaks from "remark-breaks";
@@ -31,10 +37,14 @@ const rehypeHighlightPlugin: [
     plainText: ["text", "txt", "plaintext", "plain"],
   },
 ];
-const rehypePlugins = [
-  rehypeRaw,
-  rehypeHighlightPlugin,
-];
+const rehypePlugins = [rehypeRaw, rehypeHighlightPlugin];
+
+/** Cap unwrap-plugin cache so long sessions do not retain every streamed text. */
+const UNWRAP_PLUGIN_CACHE_LIMIT = 64;
+const unwrapPluginCache = new Map<
+  string,
+  ReturnType<typeof createRemarkUnwrapSingleLineIndentedCode>
+>();
 
 export function extractPlanText(text: string): string | null {
   const match = text.match(/<proposed_plan>\s*([\s\S]*?)\s*<\/proposed_plan>/);
@@ -91,6 +101,28 @@ function createRemarkUnwrapSingleLineIndentedCode(source: string) {
   };
 }
 
+function getRemarkUnwrapPlugin(source: string) {
+  const cached = unwrapPluginCache.get(source);
+  if (cached) {
+    // Refresh LRU order.
+    unwrapPluginCache.delete(source);
+    unwrapPluginCache.set(source, cached);
+    return cached;
+  }
+
+  const plugin = createRemarkUnwrapSingleLineIndentedCode(source);
+  unwrapPluginCache.set(source, plugin);
+
+  if (unwrapPluginCache.size > UNWRAP_PLUGIN_CACHE_LIMIT) {
+    const oldest = unwrapPluginCache.keys().next().value;
+    if (oldest !== undefined) {
+      unwrapPluginCache.delete(oldest);
+    }
+  }
+
+  return plugin;
+}
+
 function joinClassNames(...names: Array<string | null | undefined | false>): string {
   return names.filter(Boolean).join(" ");
 }
@@ -99,7 +131,115 @@ function isBlockCodeClassName(className?: string): boolean {
   return /(?:^|\s)(?:hljs|language-|lang-)/.test(className ?? "");
 }
 
-export function MarkdownRenderer({
+function createMarkdownComponents(options: {
+  codeBlockLineNumbers: boolean;
+  openLocalFilePreview: (href: string) => void;
+}): Components {
+  const { codeBlockLineNumbers, openLocalFilePreview } = options;
+
+  return {
+    pre(props) {
+      const { children, node, className, ...rest } = props;
+      const codeChild = codeChildFromPre(children);
+      const language = codeLanguageFromClassName(codeChild?.props.className);
+      const codeText = textFromReactNode(codeChild?.props.children ?? children);
+      const preClassName = joinClassNames(
+        "code-block",
+        className,
+        codeBlockLineNumbers && "code-block-with-lines",
+      );
+
+      if (language === "mermaid" && isLikelyMermaidChart(codeText)) {
+        return <MermaidBlock chart={codeText.trim()} />;
+      }
+
+      if (codeBlockLineNumbers && codeChild) {
+        return (
+          <CopyableCodeBlock
+            className={preClassName}
+            copyText={codeText}
+            {...rest}
+          >
+            <code className={codeChild.props.className}>
+              {splitCodeLines(codeChild.props.children).map((line, index) => (
+                <span className="code-line" data-line={index + 1} key={index}>
+                  <span className="code-line-number" aria-hidden="true">
+                    {index + 1}
+                  </span>
+                  <span className="code-line-content">
+                    {line.length > 0 ? line : "\u00a0"}
+                  </span>
+                </span>
+              ))}
+            </code>
+          </CopyableCodeBlock>
+        );
+      }
+
+      return (
+        <CopyableCodeBlock className={preClassName} copyText={codeText} {...rest}>
+          {children}
+        </CopyableCodeBlock>
+      );
+    },
+    code(props) {
+      const { className, children, node, ...rest } = props;
+      const value = textFromReactNode(children);
+      const blockLikeCode = isBlockCodeClassName(className) || value.includes("\n");
+
+      if (blockLikeCode) {
+        return (
+          <code className={joinClassNames("code-content", className)} {...rest}>
+            {children}
+          </code>
+        );
+      }
+
+      return (
+        <code
+          className={className ? `inline-code ${className}` : "inline-code"}
+          {...rest}
+        >
+          {value.replace(/\n$/, "")}
+        </code>
+      );
+    },
+    a(props) {
+      const { href, node, onClick, ...rest } = props;
+      const hrefText = typeof href === "string" ? href : "";
+      const localFileLink = isLocalFileHref(hrefText);
+      const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
+        onClick?.(event);
+        if (event.defaultPrevented || !localFileLink) {
+          return;
+        }
+        event.preventDefault();
+        openLocalFilePreview(hrefText);
+      };
+
+      return (
+        <a
+          {...rest}
+          href={href}
+          onClick={handleClick}
+          target={localFileLink ? undefined : "_blank"}
+          rel={localFileLink ? undefined : "noreferrer"}
+          title={localFileLink ? "Preview local file" : rest.title}
+        />
+      );
+    },
+    table(props) {
+      const { children, node, ...rest } = props;
+      return (
+        <div className="markdown-table-scroll">
+          <table {...rest}>{children}</table>
+        </div>
+      );
+    },
+  };
+}
+
+function MarkdownRendererImpl({
   text,
   localFileContext,
   codeBlockLineNumbers = false,
@@ -111,151 +251,56 @@ export function MarkdownRenderer({
   const [filePreviewState, setFilePreviewState] =
     useState<LocalFilePreviewState | null>(null);
 
-  const openLocalFilePreview = (href: string) => {
-    if (!localFileContext) {
-      setFilePreviewState({
-        status: "error",
-        href,
-        message: "This session has no available working directory for local file previews.",
-      });
-      return;
-    }
-
-    setFilePreviewState({ status: "loading", href });
-    requestLocalFilePreview(localFileContext, href)
-      .then((preview) => {
-        setFilePreviewState({ status: "ready", href, preview });
-      })
-      .catch((error: unknown) => {
+  const openLocalFilePreview = useCallback(
+    (href: string) => {
+      if (!localFileContext) {
         setFilePreviewState({
           status: "error",
           href,
-          message: error instanceof Error ? error.message : "File preview failed",
+          message:
+            "This session has no available working directory for local file previews.",
         });
-      });
-  };
+        return;
+      }
+
+      setFilePreviewState({ status: "loading", href });
+      requestLocalFilePreview(localFileContext, href)
+        .then((preview) => {
+          setFilePreviewState({ status: "ready", href, preview });
+        })
+        .catch((error: unknown) => {
+          setFilePreviewState({
+            status: "error",
+            href,
+            message:
+              error instanceof Error ? error.message : "File preview failed",
+          });
+        });
+    },
+    [localFileContext],
+  );
+
+  const remarkPlugins = useMemo(
+    () => [remarkGfm, getRemarkUnwrapPlugin(text), remarkBreaks],
+    [text],
+  );
+
+  const components = useMemo(
+    () =>
+      createMarkdownComponents({
+        codeBlockLineNumbers,
+        openLocalFilePreview,
+      }),
+    [codeBlockLineNumbers, openLocalFilePreview],
+  );
 
   return (
     <>
       <Markdown
         className="markdown-body"
-        remarkPlugins={[
-          remarkGfm,
-          createRemarkUnwrapSingleLineIndentedCode(text),
-          remarkBreaks,
-        ]}
+        remarkPlugins={remarkPlugins}
         rehypePlugins={rehypePlugins}
-        components={{
-          pre(props) {
-            const { children, node, className, ...rest } = props;
-            const codeChild = codeChildFromPre(children);
-            const language = codeLanguageFromClassName(codeChild?.props.className);
-            const codeText = textFromReactNode(codeChild?.props.children ?? children);
-            const preClassName = joinClassNames(
-              "code-block",
-              className,
-              codeBlockLineNumbers && "code-block-with-lines",
-            );
-
-            if (language === "mermaid" && isLikelyMermaidChart(codeText)) {
-              return <MermaidBlock chart={codeText.trim()} />;
-            }
-
-            if (codeBlockLineNumbers && codeChild) {
-              return (
-                <CopyableCodeBlock
-                  className={preClassName}
-                  copyText={codeText}
-                  {...rest}
-                >
-                  <code className={codeChild.props.className}>
-                    {splitCodeLines(codeChild.props.children).map((line, index) => (
-                      <span
-                        className="code-line"
-                        data-line={index + 1}
-                        key={index}
-                      >
-                        <span className="code-line-number" aria-hidden="true">
-                          {index + 1}
-                        </span>
-                        <span className="code-line-content">
-                          {line.length > 0 ? line : "\u00a0"}
-                        </span>
-                      </span>
-                    ))}
-                  </code>
-                </CopyableCodeBlock>
-              );
-            }
-
-            return (
-              <CopyableCodeBlock
-                className={preClassName}
-                copyText={codeText}
-                {...rest}
-              >
-                {children}
-              </CopyableCodeBlock>
-            );
-          },
-          code(props) {
-            const { className, children, node, ...rest } = props;
-            const value = textFromReactNode(children);
-            const blockLikeCode = isBlockCodeClassName(className) || value.includes("\n");
-
-            if (blockLikeCode) {
-              return (
-                <code
-                  className={joinClassNames("code-content", className)}
-                  {...rest}
-                >
-                  {children}
-                </code>
-              );
-            }
-
-            return (
-              <code
-                className={className ? `inline-code ${className}` : "inline-code"}
-                {...rest}
-              >
-                {value.replace(/\n$/, "")}
-              </code>
-            );
-          },
-          a(props) {
-            const { href, node, onClick, ...rest } = props;
-            const hrefText = typeof href === "string" ? href : "";
-            const localFileLink = isLocalFileHref(hrefText);
-            const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
-              onClick?.(event);
-              if (event.defaultPrevented || !localFileLink) {
-                return;
-              }
-              event.preventDefault();
-              openLocalFilePreview(hrefText);
-            };
-
-            return (
-              <a
-                {...rest}
-                href={href}
-                onClick={handleClick}
-                target={localFileLink ? undefined : "_blank"}
-                rel={localFileLink ? undefined : "noreferrer"}
-                title={localFileLink ? "Preview local file" : rest.title}
-              />
-            );
-          },
-          table(props) {
-            const { children, node, ...rest } = props;
-            return (
-              <div className="markdown-table-scroll">
-                <table {...rest}>{children}</table>
-              </div>
-            );
-          },
-        }}
+        components={components}
       >
         {text}
       </Markdown>
@@ -280,3 +325,24 @@ export function MarkdownRenderer({
     </>
   );
 }
+
+function sameLocalFileContext(
+  left: LocalFileContext | null | undefined,
+  right: LocalFileContext | null | undefined,
+): boolean {
+  if (left === right) {
+    return true;
+  }
+  if (!left || !right) {
+    return !left && !right;
+  }
+  return left.threadId === right.threadId && left.cwd === right.cwd;
+}
+
+export const MarkdownRenderer = memo(MarkdownRendererImpl, (prev, next) => {
+  return (
+    prev.text === next.text &&
+    prev.codeBlockLineNumbers === next.codeBlockLineNumbers &&
+    sameLocalFileContext(prev.localFileContext, next.localFileContext)
+  );
+});

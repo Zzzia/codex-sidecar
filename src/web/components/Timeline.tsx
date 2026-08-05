@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDownToLine,
   ArrowUp,
@@ -9,6 +9,9 @@ import "./Timeline.css";
 import {
   buildTurnCards,
   resolveTurnCardStatuses,
+  type ExplorationStepView,
+  type ToolRunView,
+  type TurnCardView,
 } from "@web/lib/turns";
 import {
   ExplorationDetailsModal,
@@ -51,6 +54,8 @@ function TimelineFooterSpacer() {
   return <div className="timeline-end-spacer" aria-hidden="true" />;
 }
 
+const VIRTUOSO_COMPONENTS = { Footer: TimelineFooterSpacer };
+
 export function Timeline({
   threadId,
   cwd,
@@ -62,9 +67,17 @@ export function Timeline({
   events: Parameters<typeof buildTurnCards>[0];
   threadStatus: ThreadStatus;
 }) {
-  const cards = resolveTurnCardStatuses(buildTurnCards(events), threadStatus);
-  const localFileContext =
-    cwd.trim().length > 0 ? { threadId, cwd } satisfies LocalFileContext : null;
+  const cards = useMemo(
+    () => resolveTurnCardStatuses(buildTurnCards(events), threadStatus),
+    [events, threadStatus],
+  );
+  const localFileContext = useMemo(
+    () =>
+      cwd.trim().length > 0
+        ? ({ threadId, cwd } satisfies LocalFileContext)
+        : null,
+    [cwd, threadId],
+  );
   const listRef = useRef<VirtuosoHandle | null>(null);
   const scrollerRef = useRef<HTMLElement | null>(null);
   const [scrollerNode, setScrollerNode] = useState<HTMLElement | null>(null);
@@ -75,51 +88,58 @@ export function Timeline({
   const visibleStartIndexRef = useRef(0);
   const scrollAnchorRef = useRef<TimelineScrollAnchor | null>(null);
   const stickToBottomRef = useRef(true);
+  const lastListHeightRef = useRef(0);
   const [isAtTop, setIsAtTop] = useState(true);
   const [stickToBottom, setStickToBottom] = useState(true);
-  const [selectedItem, setSelectedItem] = useState<TimelineInspectTarget | null>(null);
+  const [selectedItem, setSelectedItem] = useState<TimelineInspectTarget | null>(
+    null,
+  );
   const initialBottomIndex =
     cards.length > 0
       ? { index: cards.length - 1, align: "end" as const }
       : undefined;
 
-  const applyStick = (next: boolean) => {
+  const applyStick = useCallback((next: boolean) => {
     stickToBottomRef.current = next;
     setStickToBottom(next);
-  };
+  }, []);
 
   useEffect(() => {
     didPrimeScrollRef.current = false;
     programmaticScrollRef.current = false;
     userIntentScrollRef.current = false;
     lastScrollTopRef.current = 0;
+    lastListHeightRef.current = 0;
     scrollAnchorRef.current = null;
     applyStick(nextStickToBottom(false, "reset_thread"));
     setIsAtTop(true);
     setSelectedItem(null);
-  }, [threadId]);
+  }, [applyStick, threadId]);
 
-  const scrollTimelineToBottom = (behavior: TimelineScrollBehavior) => {
-    if (cards.length === 0) {
-      return;
-    }
+  const scrollTimelineToBottom = useCallback(
+    (behavior: TimelineScrollBehavior) => {
+      if (cards.length === 0) {
+        return;
+      }
 
-    programmaticScrollRef.current = true;
-    userIntentScrollRef.current = false;
-    if (scrollerRef.current) {
-      scrollerRef.current.scrollTo({
-        top: scrollerRef.current.scrollHeight,
+      programmaticScrollRef.current = true;
+      userIntentScrollRef.current = false;
+      if (scrollerRef.current) {
+        scrollerRef.current.scrollTo({
+          top: scrollerRef.current.scrollHeight,
+          behavior,
+        });
+        return;
+      }
+
+      listRef.current?.scrollToIndex({
+        index: cards.length - 1,
+        align: "end",
         behavior,
       });
-      return;
-    }
-
-    listRef.current?.scrollToIndex({
-      index: cards.length - 1,
-      align: "end",
-      behavior,
-    });
-  };
+    },
+    [cards.length],
+  );
 
   useEffect(() => {
     if (!stickToBottom || cards.length === 0 || events.length === 0) {
@@ -136,7 +156,7 @@ export function Timeline({
     return () => {
       cancelAnimationFrame(frame);
     };
-  }, [cards.length, events.length, stickToBottom]);
+  }, [cards.length, events.length, scrollTimelineToBottom, stickToBottom]);
 
   useEffect(() => {
     if (!scrollerNode) {
@@ -222,8 +242,11 @@ export function Timeline({
       scrollerNode.removeEventListener("pointerdown", markScrollbarPointerIntent);
       window.removeEventListener("resize", syncScrollState);
     };
-  }, [scrollerNode, cards.length]);
+  }, [applyStick, scrollerNode]);
 
+  // Preserve scroll position when list height changes (content growth / reflow).
+  // Prefer Virtuoso's totalListHeightChanged + a single scroller ResizeObserver
+  // over subtree MutationObserver + per-card ResizeObserver.
   useEffect(() => {
     if (!scrollerNode) {
       return;
@@ -297,43 +320,43 @@ export function Timeline({
       });
     };
 
-    const resizeObserver = new ResizeObserver(preserveAnchorAfterResize);
-    const observedElements = new Set<Element>();
-
-    const observeRenderedTimelineItems = () => {
-      const nextElements = new Set<Element>([
-        scrollerNode,
-        ...scrollerNode.querySelectorAll("[data-card-index], .timeline-end-spacer"),
-      ]);
-
-      for (const element of observedElements) {
-        if (!nextElements.has(element)) {
-          resizeObserver.unobserve(element);
-          observedElements.delete(element);
-        }
-      }
-
-      for (const element of nextElements) {
-        if (!observedElements.has(element)) {
-          resizeObserver.observe(element);
-          observedElements.add(element);
-        }
-      }
-    };
-    observeRenderedTimelineItems();
-
-    const mutationObserver = new MutationObserver(observeRenderedTimelineItems);
-    mutationObserver.observe(scrollerNode, {
-      childList: true,
-      subtree: true,
+    const resizeObserver = new ResizeObserver(() => {
+      preserveAnchorAfterResize();
     });
+    resizeObserver.observe(scrollerNode);
 
     return () => {
-      mutationObserver.disconnect();
       resizeObserver.disconnect();
       clearFrames();
     };
-  }, [scrollerNode, cards.length]);
+  }, [applyStick, scrollerNode]);
+
+  const handleTotalListHeightChanged = useCallback((height: number) => {
+    if (height === lastListHeightRef.current) {
+      return;
+    }
+    lastListHeightRef.current = height;
+
+    const scroller = scrollerRef.current;
+    if (!scroller) {
+      return;
+    }
+
+    const anchor =
+      scrollAnchorRef.current ?? readTimelineScrollAnchor(scroller);
+    if (!anchor) {
+      return;
+    }
+
+    if (anchor.atBottom || stickToBottomRef.current) {
+      programmaticScrollRef.current = true;
+      userIntentScrollRef.current = false;
+      scroller.scrollTop = scroller.scrollHeight;
+      return;
+    }
+
+    restoreTimelineScrollAnchor(scroller, anchor);
+  }, []);
 
   const jumpToBottom = () => {
     if (cards.length === 0) {
@@ -363,43 +386,64 @@ export function Timeline({
     });
   };
 
+  const onInspectTool = useCallback((tool: ToolRunView) => {
+    setSelectedItem({ kind: "tool", tool });
+  }, []);
+
+  const onInspectExploration = useCallback((step: ExplorationStepView) => {
+    setSelectedItem({ kind: "exploration", step });
+  }, []);
+
+  const itemContent = useCallback(
+    (index: number, card: TurnCardView) => (
+      <TurnCard
+        index={index}
+        card={card}
+        onInspectTool={onInspectTool}
+        onInspectExploration={onInspectExploration}
+        localFileContext={localFileContext}
+      />
+    ),
+    [localFileContext, onInspectExploration, onInspectTool],
+  );
+
+  const handleRangeChanged = useCallback(
+    (range: { startIndex: number }) => {
+      visibleStartIndexRef.current = range.startIndex;
+    },
+    [],
+  );
+
+  const handleScrollerRef = useCallback((node: HTMLElement | Window | null) => {
+    if (scrollerRef.current && scrollerRef.current !== node) {
+      scrollerRef.current.classList.remove("timeline-scroller");
+    }
+
+    if (node instanceof HTMLElement) {
+      scrollerRef.current = node;
+      setScrollerNode(node);
+      node.classList.add("timeline-scroller");
+      return;
+    }
+
+    scrollerRef.current = null;
+    setScrollerNode(null);
+  }, []);
+
   return (
     <div className="timeline-shell">
       <Virtuoso
         ref={listRef}
         data={cards}
         alignToBottom
-        components={{ Footer: TimelineFooterSpacer }}
+        components={VIRTUOSO_COMPONENTS}
         computeItemKey={(_, card) => card.id}
         followOutput={stickToBottom ? "smooth" : false}
         initialTopMostItemIndex={initialBottomIndex}
-        rangeChanged={(range) => {
-          visibleStartIndexRef.current = range.startIndex;
-        }}
-        scrollerRef={(node) => {
-          if (scrollerRef.current && scrollerRef.current !== node) {
-            scrollerRef.current.classList.remove("timeline-scroller");
-          }
-
-          if (node instanceof HTMLElement) {
-            scrollerRef.current = node;
-            setScrollerNode(node);
-            node.classList.add("timeline-scroller");
-            return;
-          }
-
-          scrollerRef.current = null;
-          setScrollerNode(null);
-        }}
-        itemContent={(index, card) => (
-          <TurnCard
-            index={index}
-            card={card}
-            onInspectTool={(tool) => setSelectedItem({ kind: "tool", tool })}
-            onInspectExploration={(step) => setSelectedItem({ kind: "exploration", step })}
-            localFileContext={localFileContext}
-          />
-        )}
+        rangeChanged={handleRangeChanged}
+        totalListHeightChanged={handleTotalListHeightChanged}
+        scrollerRef={handleScrollerRef}
+        itemContent={itemContent}
       />
 
       {!isAtTop || !stickToBottom ? (

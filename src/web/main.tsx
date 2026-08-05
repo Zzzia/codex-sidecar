@@ -6,6 +6,9 @@ import "./components/PreviewModalShell.css";
 import "./components/MarkdownRenderer.css";
 import "./components/CopyableCodeBlock.css";
 import App from "./App";
+import { applySoftPaintClass } from "./lib/softPaint";
+
+applySoftPaintClass();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
