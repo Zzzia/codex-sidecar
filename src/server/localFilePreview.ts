@@ -11,6 +11,9 @@ const MAX_EMBED_PREVIEW_BYTES = 8_000_000;
 
 const MARKDOWN_EXTENSIONS = new Set([".md", ".markdown", ".mdx"]);
 
+/** Plain-text files that often store Markdown reports (e.g. workflow outputs). */
+const TEXT_EXTENSIONS = new Set([".txt", ".log"]);
+
 const IMAGE_MIME_TYPES = new Map<string, string>([
   [".avif", "image/avif"],
   [".bmp", "image/bmp"],
@@ -61,7 +64,6 @@ const CODE_EXTENSIONS = new Set([
   ".toml",
   ".ts",
   ".tsx",
-  ".txt",
   ".vue",
   ".xml",
   ".yaml",
@@ -174,10 +176,35 @@ function previewKindForPath(filePath: string): LocalFilePreviewKind {
   if (extension === ".pdf") {
     return "pdf";
   }
+  if (TEXT_EXTENSIONS.has(extension)) {
+    // Content sniff decides markdown vs plain code after read.
+    return "code";
+  }
   if (CODE_EXTENSIONS.has(extension) || CODE_FILENAMES.has(basename)) {
     return "code";
   }
   return "unsupported";
+}
+
+/**
+ * Prefer Markdown rendering when a .txt/.log report contains common MD structure.
+ * Avoid treating arbitrary plain logs as Markdown.
+ */
+export function looksLikeMarkdownText(content: string): boolean {
+  const sample = content.slice(0, 12_000);
+  if (/^#{1,6}\s+\S/m.test(sample)) {
+    return true;
+  }
+  if (/^\s*[-*+]\s+\S/m.test(sample) && /\[.+\]\(.+\)/.test(sample)) {
+    return true;
+  }
+  if (/^\s*\|.+\|\s*$/m.test(sample) && /^\s*\|?\s*:?-{3,}/m.test(sample)) {
+    return true;
+  }
+  if (/```[\w-]*\n[\s\S]*?```/.test(sample)) {
+    return true;
+  }
+  return false;
 }
 
 function maxBytesForKind(kind: LocalFilePreviewKind): number {
@@ -259,10 +286,18 @@ export async function previewLocalFile(
   }
 
   const content = await readFile(realTargetPath, "utf8");
+  const extension = path.extname(targetPath).toLowerCase();
+  const resolvedKind =
+    kind === "code" &&
+    TEXT_EXTENSIONS.has(extension) &&
+    looksLikeMarkdownText(content)
+      ? "markdown"
+      : kind;
+
   return {
     path: targetPath,
     displayPath,
-    kind,
+    kind: resolvedKind,
     size: fileStat.size,
     content,
   };

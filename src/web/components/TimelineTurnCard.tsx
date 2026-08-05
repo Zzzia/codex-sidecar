@@ -106,12 +106,14 @@ function TurnCardImpl({
   onInspectTool,
   onInspectExploration,
   localFileContext,
+  onOpenLocalFile,
 }: {
   index: number;
   card: TurnCardView;
   onInspectTool: (tool: ToolRunView) => void;
   onInspectExploration: (step: ExplorationStepView) => void;
   localFileContext: LocalFileContext | null;
+  onOpenLocalFile?: (href: string) => void;
 }) {
   return (
     <article
@@ -133,7 +135,11 @@ function TurnCardImpl({
 
       {card.userText ? (
         <section className="turn-question">
-          <MarkdownRenderer text={card.userText} localFileContext={localFileContext} />
+          <MarkdownRenderer
+            text={card.userText}
+            localFileContext={localFileContext}
+            onOpenLocalFile={onOpenLocalFile}
+          />
         </section>
       ) : null}
 
@@ -141,7 +147,11 @@ function TurnCardImpl({
         if (block.type === "assistant_markdown") {
           return (
             <section key={block.id} className="turn-answer">
-              <MarkdownRenderer text={block.text} localFileContext={localFileContext} />
+              <MarkdownRenderer
+                text={block.text}
+                localFileContext={localFileContext}
+                onOpenLocalFile={onOpenLocalFile}
+              />
             </section>
           );
         }
@@ -150,7 +160,11 @@ function TurnCardImpl({
           return (
             <section key={block.id} className="turn-proposed-plan">
               <div className="turn-proposed-plan-label">Proposed Plan</div>
-              <MarkdownRenderer text={block.text} localFileContext={localFileContext} />
+              <MarkdownRenderer
+                text={block.text}
+                localFileContext={localFileContext}
+                onOpenLocalFile={onOpenLocalFile}
+              />
             </section>
           );
         }

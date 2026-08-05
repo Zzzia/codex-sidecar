@@ -130,6 +130,45 @@ test("previewLocalFile previews absolute paths outside cwd", async (t) => {
   assert.match(preview.content ?? "", /outside/);
 });
 
+test("previewLocalFile renders markdown-like .txt reports as markdown", async (t) => {
+  const workspace = await createWorkspace();
+  t.after(() => rm(workspace, { recursive: true, force: true }));
+
+  const reportPath = path.join(workspace, "output.txt");
+  await writeFile(
+    reportPath,
+    [
+      "完整节点结果文件: /tmp/output.txt",
+      "",
+      "## 项目 Review 报告",
+      "",
+      "**结论**: 建议修改",
+      "",
+      "| 项 | 值 |",
+      "|---|---|",
+      "| 仓库 | /tmp/demo |",
+      "",
+    ].join("\n"),
+  );
+
+  const preview = await previewLocalFile(workspace, "output.txt");
+  assert.equal(preview.kind, "markdown");
+  assert.match(preview.content ?? "", /Review 报告/);
+});
+
+test("previewLocalFile keeps plain .txt logs as code", async (t) => {
+  const workspace = await createWorkspace();
+  t.after(() => rm(workspace, { recursive: true, force: true }));
+
+  await writeFile(
+    path.join(workspace, "plain.txt"),
+    "line one\nline two without markdown structure\n",
+  );
+
+  const preview = await previewLocalFile(workspace, "plain.txt");
+  assert.equal(preview.kind, "code");
+});
+
 test("previewLocalFile previews symlinks that resolve outside cwd", async (t) => {
   const workspace = await createWorkspace();
   const outside = await mkdtemp(path.join(os.tmpdir(), "codex-sidecar-outside-"));

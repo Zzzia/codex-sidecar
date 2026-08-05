@@ -1,8 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  ArrowDownToLine,
-  ArrowUp,
-} from "lucide-react";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import type { ThreadStatus } from "@shared/types";
 import "./Timeline.css";
@@ -31,10 +27,13 @@ import {
   nextStickToBottom,
   stickAfterScroll,
 } from "./timelineStickToBottom";
+import { TimelineJumpControls } from "./TimelineJumpControls";
+import { TimelineLocalFilePreview } from "./TimelineLocalFilePreview";
 import {
   TurnCard,
   type TimelineInspectTarget,
 } from "./TimelineTurnCard";
+import { useLocalFilePreview } from "@web/hooks/useLocalFilePreview";
 
 type TimelineScrollBehavior = "auto" | "smooth";
 
@@ -94,6 +93,8 @@ export function Timeline({
   const [selectedItem, setSelectedItem] = useState<TimelineInspectTarget | null>(
     null,
   );
+  const { filePreviewState, openLocalFile, clearFilePreview } =
+    useLocalFilePreview(localFileContext);
   const initialBottomIndex =
     cards.length > 0
       ? { index: cards.length - 1, align: "end" as const }
@@ -114,7 +115,8 @@ export function Timeline({
     applyStick(nextStickToBottom(false, "reset_thread"));
     setIsAtTop(true);
     setSelectedItem(null);
-  }, [applyStick, threadId]);
+    clearFilePreview();
+  }, [applyStick, clearFilePreview, threadId]);
 
   const scrollTimelineToBottom = useCallback(
     (behavior: TimelineScrollBehavior) => {
@@ -402,9 +404,10 @@ export function Timeline({
         onInspectTool={onInspectTool}
         onInspectExploration={onInspectExploration}
         localFileContext={localFileContext}
+        onOpenLocalFile={openLocalFile}
       />
     ),
-    [localFileContext, onInspectExploration, onInspectTool],
+    [localFileContext, onInspectExploration, onInspectTool, openLocalFile],
   );
 
   const handleRangeChanged = useCallback(
@@ -446,29 +449,12 @@ export function Timeline({
         itemContent={itemContent}
       />
 
-      {!isAtTop || !stickToBottom ? (
-        <div className="timeline-jump-stack">
-          {!isAtTop ? (
-            <button
-              className="timeline-jump-button"
-              onClick={jumpToTop}
-              title="Back to current turn top"
-            >
-              <ArrowUp size={15} />
-            </button>
-          ) : null}
-
-          {!stickToBottom ? (
-            <button
-              className="timeline-jump-button"
-              onClick={jumpToBottom}
-              title="Follow latest"
-            >
-              <ArrowDownToLine size={15} />
-            </button>
-          ) : null}
-        </div>
-      ) : null}
+      <TimelineJumpControls
+        showJumpTop={!isAtTop}
+        showJumpBottom={!stickToBottom}
+        onJumpTop={jumpToTop}
+        onJumpBottom={jumpToBottom}
+      />
 
       {selectedItem?.kind === "tool" ? (
         <ToolDetailsModal
@@ -483,6 +469,14 @@ export function Timeline({
           step={selectedItem.step}
           localFileContext={localFileContext}
           onClose={() => setSelectedItem(null)}
+        />
+      ) : null}
+
+      {filePreviewState && localFileContext ? (
+        <TimelineLocalFilePreview
+          context={localFileContext}
+          state={filePreviewState}
+          onClose={clearFilePreview}
         />
       ) : null}
     </div>

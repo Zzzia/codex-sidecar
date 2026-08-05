@@ -20,6 +20,7 @@ import { CopyableCodeBlock } from "./CopyableCodeBlock";
 import { LocalFilePreviewModal } from "./LocalFilePreviewModal";
 import {
   isLocalFileHref,
+  localFileAnchorHref,
   requestLocalFilePreview,
   type LocalFileContext,
   type LocalFilePreviewState,
@@ -133,7 +134,7 @@ function isBlockCodeClassName(className?: string): boolean {
 
 function createMarkdownComponents(options: {
   codeBlockLineNumbers: boolean;
-  openLocalFilePreview: (href: string) => void;
+  openLocalFilePreview: ((href: string) => void) | null;
 }): Components {
   const { codeBlockLineNumbers, openLocalFilePreview } = options;
 
@@ -208,23 +209,26 @@ function createMarkdownComponents(options: {
       const { href, node, onClick, ...rest } = props;
       const hrefText = typeof href === "string" ? href : "";
       const localFileLink = isLocalFileHref(hrefText);
+      const canPreviewLocalFile = localFileLink && openLocalFilePreview != null;
       const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
         onClick?.(event);
-        if (event.defaultPrevented || !localFileLink) {
+        if (event.defaultPrevented || !canPreviewLocalFile) {
           return;
         }
         event.preventDefault();
+        event.stopPropagation();
         openLocalFilePreview(hrefText);
       };
 
       return (
         <a
           {...rest}
-          href={href}
+          href={canPreviewLocalFile ? localFileAnchorHref(hrefText) : href}
+          data-local-file-href={canPreviewLocalFile ? hrefText : undefined}
           onClick={handleClick}
-          target={localFileLink ? undefined : "_blank"}
-          rel={localFileLink ? undefined : "noreferrer"}
-          title={localFileLink ? "Preview local file" : rest.title}
+          target={canPreviewLocalFile ? undefined : localFileLink ? undefined : "_blank"}
+          rel={canPreviewLocalFile ? undefined : localFileLink ? undefined : "noreferrer"}
+          title={canPreviewLocalFile ? "Preview local file" : rest.title}
         />
       );
     },
@@ -243,16 +247,28 @@ function MarkdownRendererImpl({
   text,
   localFileContext,
   codeBlockLineNumbers = false,
+  onOpenLocalFile,
 }: {
   text: string;
   localFileContext?: LocalFileContext | null;
   codeBlockLineNumbers?: boolean;
+  /**
+   * When provided, local file clicks are delegated to the parent (Timeline).
+   * Owned preview state inside this component is only used as a fallback for
+   * non-virtualized surfaces (modals, inspectors).
+   */
+  onOpenLocalFile?: (href: string) => void;
 }) {
   const [filePreviewState, setFilePreviewState] =
     useState<LocalFilePreviewState | null>(null);
 
   const openLocalFilePreview = useCallback(
     (href: string) => {
+      if (onOpenLocalFile) {
+        onOpenLocalFile(href);
+        return;
+      }
+
       if (!localFileContext) {
         setFilePreviewState({
           status: "error",
@@ -277,8 +293,11 @@ function MarkdownRendererImpl({
           });
         });
     },
-    [localFileContext],
+    [localFileContext, onOpenLocalFile],
   );
+
+  const canOpenLocalFile =
+    Boolean(onOpenLocalFile) || Boolean(localFileContext);
 
   const remarkPlugins = useMemo(
     () => [remarkGfm, getRemarkUnwrapPlugin(text), remarkBreaks],
@@ -289,9 +308,9 @@ function MarkdownRendererImpl({
     () =>
       createMarkdownComponents({
         codeBlockLineNumbers,
-        openLocalFilePreview,
+        openLocalFilePreview: canOpenLocalFile ? openLocalFilePreview : null,
       }),
-    [codeBlockLineNumbers, openLocalFilePreview],
+    [canOpenLocalFile, codeBlockLineNumbers, openLocalFilePreview],
   );
 
   return (
@@ -305,7 +324,7 @@ function MarkdownRendererImpl({
         {text}
       </Markdown>
 
-      {filePreviewState && localFileContext ? (
+      {filePreviewState && localFileContext && !onOpenLocalFile ? (
         <LocalFilePreviewModal
           context={localFileContext}
           state={filePreviewState}
@@ -343,6 +362,7 @@ export const MarkdownRenderer = memo(MarkdownRendererImpl, (prev, next) => {
   return (
     prev.text === next.text &&
     prev.codeBlockLineNumbers === next.codeBlockLineNumbers &&
+    prev.onOpenLocalFile === next.onOpenLocalFile &&
     sameLocalFileContext(prev.localFileContext, next.localFileContext)
   );
 });

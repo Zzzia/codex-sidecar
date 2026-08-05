@@ -35,6 +35,16 @@ export function isLocalFileHref(href: string): boolean {
   return schemeMatch[0].toLowerCase() === "file:";
 }
 
+/**
+ * Absolute filesystem paths look like site-root URLs to the browser
+ * (`/home/...` → `http://host/home/...`). Use a non-navigating href so
+ * middle-click / open-in-new-tab does not leave the app; the real path
+ * stays on data attributes for the click handler.
+ */
+export function localFileAnchorHref(href: string): string {
+  return isLocalFileHref(href) ? "#" : href;
+}
+
 export async function requestLocalFilePreview(
   context: LocalFileContext,
   href: string,
