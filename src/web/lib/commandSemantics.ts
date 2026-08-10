@@ -1,5 +1,6 @@
 import type { ParsedCommand } from "@shared/types";
 import { extractNestedExecCommandTexts } from "./codeModeExec";
+import { summarizeNestedToolCalls } from "./codeModeNestedTools";
 import {
   extractNestedWriteStdinActions,
   writeStdinActionsPreview,
@@ -359,14 +360,23 @@ export function shellCommandTextFromInvocation(
 
 /**
  * Best-effort human summary for a code-mode `exec` freeform script.
- * Prefers nested shell cmds; falls back to write_stdin interaction summary.
+ * Prefers nested shell cmds, then write_stdin interactions, then other nested
+ * tools (MCP etc.). Never returns the raw JS script body.
  */
 export function summarizeCodeModeExecScript(scriptText: string): string {
   const shellCommands = extractNestedExecCommandTexts(scriptText);
   if (shellCommands.length > 0) {
     return shellCommands.join(" && ");
   }
-  return writeStdinActionsPreview(extractNestedWriteStdinActions(scriptText));
+
+  const writeStdinPreview = writeStdinActionsPreview(
+    extractNestedWriteStdinActions(scriptText),
+  );
+  if (writeStdinPreview) {
+    return writeStdinPreview;
+  }
+
+  return summarizeNestedToolCalls(scriptText);
 }
 
 /**

@@ -137,6 +137,198 @@ test("buildTurnCards keeps patch data in a dedicated patch block", () => {
   assert.equal(cards[0].blocks[0].items[0]?.summary, "已更新 1 个文件");
 });
 
+test("buildTurnCards expands code-mode apply_patch scripts into patch cards", () => {
+  const patchBody = `*** Begin Patch
+*** Add File: /tmp/skill-release-state-prototype.TqOlhd/prototype.ts
++// THROWAWAY PROTOTYPE
++export const ok = true;
+*** End Patch`;
+  const script = `const patch = ${JSON.stringify(patchBody)};
+text(await tools.apply_patch(patch));
+`;
+
+  const events: TimelineEvent[] = [
+    {
+      id: "u1",
+      ts: "2026-08-07T08:00:01.000Z",
+      kind: "message",
+      role: "user",
+      text: "写个原型",
+      isPlan: false,
+    },
+    {
+      id: "c1",
+      ts: "2026-08-07T08:00:02.000Z",
+      kind: "tool_call",
+      callId: "call_outer_exec",
+      tool: {
+        name: "exec",
+        argumentsText: script,
+        toolType: "custom_tool_call",
+      },
+    },
+    {
+      id: "p1",
+      ts: "2026-08-07T08:00:03.000Z",
+      kind: "patch",
+      callId: "exec-5d786ea2-09d6-4b5a-9b1e-d344b576665d",
+      success: true,
+      summary: "Updated 1 file",
+      changes: [
+        {
+          path: "/tmp/skill-release-state-prototype.TqOlhd/prototype.ts",
+          displayPath: "prototype.ts",
+          changeType: "add",
+          unifiedDiff:
+            "--- /dev/null\n+++ b/prototype.ts\n@@ -0,0 +1,2 @@\n+// THROWAWAY PROTOTYPE\n+export const ok = true;",
+        },
+      ],
+    },
+    {
+      id: "r1",
+      ts: "2026-08-07T08:00:04.000Z",
+      kind: "tool_result",
+      callId: "call_outer_exec",
+      name: "exec",
+      result: {
+        toolType: "custom_tool_call_output",
+        title: "exec",
+        success: true,
+        exitCode: 0,
+        outputText: "Script completed",
+        stderrText: "",
+        raw: null,
+      },
+    },
+  ];
+
+  const cards = buildTurnCards(events);
+  assert.equal(cards.length, 1);
+  const blocks = cards[0]?.blocks ?? [];
+  assert.equal(
+    blocks.some((block) => block.type === "tool_runs"),
+    false,
+    "outer apply_patch-only exec must not become a tool row",
+  );
+  const patchBlock = blocks.find((block) => block.type === "patch_runs");
+  if (!patchBlock || patchBlock.type !== "patch_runs") {
+    assert.fail("expected patch block");
+  }
+  assert.equal(patchBlock.items.length, 1);
+  assert.equal(patchBlock.items[0]?.changes.length, 1);
+  assert.equal(patchBlock.items[0]?.summary, "Updated 1 file");
+  assert.equal(
+    patchBlock.items[0]?.changes[0]?.path,
+    "/tmp/skill-release-state-prototype.TqOlhd/prototype.ts",
+  );
+  assert.ok(
+    patchBlock.items[0]?.changes[0]?.unifiedDiff.includes("export const ok = true"),
+  );
+});
+
+test("buildTurnCards previews nested MCP tools instead of code-mode script", () => {
+  const script = `const result = await tools.mcp__ibrain__ibrain_get_run({run_id:"run-dccb2bef4cf1462f983a0e23eddf99fe",wait_seconds:60});
+if (result?.structuredContent) text(result.structuredContent);
+else text(result);
+`;
+
+  const events: TimelineEvent[] = [
+    {
+      id: "u1",
+      ts: "2026-08-10T10:00:01.000Z",
+      kind: "message",
+      role: "user",
+      text: "查一下 run",
+      isPlan: false,
+    },
+    {
+      id: "c1",
+      ts: "2026-08-10T10:00:02.000Z",
+      kind: "tool_call",
+      callId: "call_mcp",
+      tool: {
+        name: "exec",
+        argumentsText: script,
+        toolType: "custom_tool_call",
+      },
+    },
+  ];
+
+  const cards = buildTurnCards(events);
+  const toolBlock = cards[0]?.blocks.find((block) => block.type === "tool_runs");
+  if (!toolBlock || toolBlock.type !== "tool_runs") {
+    assert.fail("expected tool block");
+  }
+  assert.equal(toolBlock.items[0]?.preview, "ibrain/ibrain_get_run");
+  assert.notEqual(toolBlock.items[0]?.preview, "code-mode script");
+});
+
+test("buildTurnCards keeps shell work when code-mode mixes exec_command and apply_patch", () => {
+  const patchBody = `*** Begin Patch
+*** Update File: /tmp/demo.ts
+@@
+-a
++b
+*** End Patch`;
+  const script = `const patch = ${JSON.stringify(patchBody)};
+await tools.apply_patch(patch);
+await tools.exec_command({cmd:"rg -n demo /tmp",workdir:"/tmp"});
+`;
+
+  const events: TimelineEvent[] = [
+    {
+      id: "u1",
+      ts: "2026-08-07T09:00:01.000Z",
+      kind: "message",
+      role: "user",
+      text: "改完再搜",
+      isPlan: false,
+    },
+    {
+      id: "c1",
+      ts: "2026-08-07T09:00:02.000Z",
+      kind: "tool_call",
+      callId: "call_mixed",
+      tool: {
+        name: "exec",
+        argumentsText: script,
+        toolType: "custom_tool_call",
+      },
+    },
+    {
+      id: "p1",
+      ts: "2026-08-07T09:00:03.000Z",
+      kind: "patch",
+      callId: "exec-mixed-patch",
+      success: true,
+      summary: "Updated 1 file",
+      changes: [
+        {
+          path: "/tmp/demo.ts",
+          displayPath: "demo.ts",
+          changeType: "update",
+          unifiedDiff: "@@ -1 +1 @@\n-a\n+b",
+        },
+      ],
+    },
+  ];
+
+  const cards = buildTurnCards(events);
+  const blocks = cards[0]?.blocks ?? [];
+  const patchBlock = blocks.find((block) => block.type === "patch_runs");
+  if (!patchBlock || patchBlock.type !== "patch_runs") {
+    assert.fail("expected patch block");
+  }
+  assert.equal(patchBlock.items.length, 1);
+
+  const hasShellPresentation = blocks.some(
+    (block) =>
+      (block.type === "tool_runs" || block.type === "exploration_runs") &&
+      block.items.length > 0,
+  );
+  assert.equal(hasShellPresentation, true);
+});
+
 test("buildTurnCards coalesces exploratory exec commands into one exploration block", () => {
   const events: TimelineEvent[] = [
     {

@@ -36,6 +36,13 @@ function toolDisplayName(tool: ToolRunView): string {
     ) {
       return "Interact";
     }
+    // Nested MCP / generic tools inside exec — not a shell command.
+    if (!tool.commandText && tool.preview && tool.preview !== "code-mode script") {
+      return "Tool";
+    }
+    if (!tool.commandText) {
+      return "Script";
+    }
     return "Run";
   }
   return tool.name;
