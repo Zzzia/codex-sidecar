@@ -8,8 +8,10 @@ export interface PreparedDiffView {
   note: string | null;
 }
 
-const HUNK_HEADER_RE = /^@@ /;
-const DIFF_BODY_RE = /^(?:@@ |[ +\-\\])/;
+/** Codex apply_patch often emits bare `@@`; standard unified form has ranges. */
+const HUNK_HEADER_RE = /^@@/;
+const VALID_HUNK_HEADER_RE = /^@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@/;
+const DIFF_BODY_RE = /^(?:@@|[ +\-\\])/;
 
 function normalizeLines(text: string): string[] {
   return text
@@ -45,6 +47,99 @@ function headerFileName(header: string, fallback: string): string {
   }
 
   return value.replace(/^[ab]\//, "");
+}
+
+function isHunkHeaderLine(line: string): boolean {
+  return line.startsWith("@@");
+}
+
+function isValidHunkHeader(line: string): boolean {
+  return VALID_HUNK_HEADER_RE.test(line);
+}
+
+function countHunkSides(bodyLines: string[]): { oldCount: number; newCount: number } {
+  let oldCount = 0;
+  let newCount = 0;
+
+  for (const line of bodyLines) {
+    if (line.startsWith("\\")) {
+      // "\ No newline at end of file" — not a content line.
+      continue;
+    }
+    if (line.startsWith("-")) {
+      oldCount += 1;
+      continue;
+    }
+    if (line.startsWith("+")) {
+      newCount += 1;
+      continue;
+    }
+    // Context line (leading space, or empty treated as context).
+    oldCount += 1;
+    newCount += 1;
+  }
+
+  return { oldCount, newCount };
+}
+
+/**
+ * Rewrite bare / incomplete `@@` headers into standard unified ranges so
+ * @git-diff-view can parse multi-hunk Codex apply_patch output.
+ */
+export function normalizeHunkHeaders(bodyLines: string[]): string[] {
+  const result: string[] = [];
+  let index = 0;
+  let oldCursor = 1;
+  let newCursor = 1;
+
+  while (index < bodyLines.length) {
+    const line = bodyLines[index] ?? "";
+    if (!isHunkHeaderLine(line)) {
+      result.push(line);
+      index += 1;
+      continue;
+    }
+
+    const headerLine = line;
+    index += 1;
+    const hunkBody: string[] = [];
+    while (index < bodyLines.length && !isHunkHeaderLine(bodyLines[index] ?? "")) {
+      hunkBody.push(bodyLines[index] ?? "");
+      index += 1;
+    }
+
+    if (isValidHunkHeader(headerLine)) {
+      result.push(headerLine, ...hunkBody);
+      const { oldCount, newCount } = countHunkSides(hunkBody);
+      // Advance cursors from declared ranges when present so later synthesized
+      // hunks stay ordered; fall back to body counts.
+      const match = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(headerLine);
+      if (match) {
+        const oldStart = Number(match[1]);
+        const oldLen = match[2] == null ? 1 : Number(match[2]);
+        const newStart = Number(match[3]);
+        const newLen = match[4] == null ? 1 : Number(match[4]);
+        oldCursor = oldStart + oldLen;
+        newCursor = newStart + newLen;
+      } else {
+        oldCursor += oldCount;
+        newCursor += newCount;
+      }
+      continue;
+    }
+
+    const { oldCount, newCount } = countHunkSides(hunkBody);
+    const oldStart = oldCount === 0 ? Math.max(0, oldCursor - 1) : oldCursor;
+    const newStart = newCount === 0 ? Math.max(0, newCursor - 1) : newCursor;
+    result.push(
+      `@@ -${oldStart},${oldCount} +${newStart},${newCount} @@`,
+      ...hunkBody,
+    );
+    oldCursor = oldCount === 0 ? oldCursor : oldStart + oldCount;
+    newCursor = newCount === 0 ? newCursor : newStart + newCount;
+  }
+
+  return result;
 }
 
 function extractDiffText(unifiedDiff: string, fileName: string, changeType: PatchChangeType) {
@@ -94,10 +189,11 @@ function extractDiffText(unifiedDiff: string, fileName: string, changeType: Patc
   }
 
   const [fallbackOldHeader, fallbackNewHeader] = defaultHeaders(fileName, changeType);
+  const normalizedBody = normalizeHunkHeaders(bodyLines);
   const diffText = [
     oldHeader || fallbackOldHeader,
     newHeader || fallbackNewHeader,
-    ...bodyLines,
+    ...normalizedBody,
   ].join("\n");
 
   return {

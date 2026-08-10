@@ -64,3 +64,48 @@ test("prepareDiffView falls back to raw text for non-hunk diffs", () => {
   assert.equal(prepared.diffFile, null);
   assert.match(prepared.fallbackText, /Binary files/);
 });
+
+test("prepareDiffView normalizes bare @@ multi-hunk Codex apply_patch diffs", () => {
+  const prepared = prepareDiffView(
+    "design.md",
+    [
+      "--- a/design.md",
+      "+++ b/design.md",
+      "@@",
+      "-## 5. 状态与发布流程",
+      "+## 6. 状态与发布流程",
+      "@@",
+      "-## 6. 数据与接口边界",
+      "+## 7. 数据与接口边界",
+      "@@",
+      "-## 7. 各仓改造",
+      "+## 8. 各仓改造",
+    ].join("\n"),
+    "update",
+  );
+
+  assert.ok(prepared.diffFile, "expected structured DiffFile for bare @@ hunks");
+  assert.equal(prepared.note, null);
+  // Three one-line replacements → six unified lines.
+  assert.equal(prepared.diffFile?.unifiedLineLength, 6);
+  assert.match(prepared.fallbackText, /@@ -1,1 \+1,1 @@/);
+  assert.match(prepared.fallbackText, /@@ -2,1 \+2,1 @@/);
+  assert.match(prepared.fallbackText, /@@ -3,1 \+3,1 @@/);
+});
+
+test("prepareDiffView keeps already-valid hunk headers intact", () => {
+  const prepared = prepareDiffView(
+    "src/demo.ts",
+    [
+      "--- a/src/demo.ts",
+      "+++ b/src/demo.ts",
+      "@@ -10,2 +10,2 @@",
+      "-old",
+      "+new",
+    ].join("\n"),
+    "update",
+  );
+
+  assert.ok(prepared.diffFile);
+  assert.match(prepared.fallbackText, /@@ -10,2 \+10,2 @@/);
+});
