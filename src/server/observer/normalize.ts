@@ -17,6 +17,13 @@ import {
   stripMemoryCitationBlocks,
   summarizeThreadText,
 } from "./normalizeText.js";
+import {
+  compactionEvent,
+  compactionReplacesAssistant,
+  countReplacementHistoryItems,
+  describeCompactionDetail,
+  eventItemType,
+} from "./normalizeCompaction.js";
 
 export { summarizeThreadText } from "./normalizeText.js";
 
@@ -25,6 +32,7 @@ interface RuntimeContext {
   callNames: Map<string, string>;
   callArguments?: Map<string, string>;
   status: ThreadStatus;
+  lastAssistantText?: string;
 }
 
 function createEventId(
@@ -36,18 +44,38 @@ function createEventId(
   return [ts, rawType, lineNumber, suffix].filter(Boolean).join(":");
 }
 
-function countReplacementHistoryItems(payload: Record<string, unknown>): number | undefined {
-  return Array.isArray(payload.replacement_history)
-    ? payload.replacement_history.length
-    : undefined;
-}
-
-function describeCompactionDetail(replacementItemCount: number | undefined): string {
-  if (typeof replacementItemCount !== "number") {
-    return "Codex is organizing long-session context";
+function userMessageTextFromEvent(
+  type: string,
+  payload: Record<string, unknown>,
+): string | null {
+  if (type === "user_message") {
+    return typeof payload.message === "string" ? payload.message.trim() : "";
   }
 
-  return `Codex is organizing long-session context, keeping ${replacementItemCount} history items`;
+  if (type === "item_completed" && eventItemType(payload) === "UserMessage") {
+    const item = payload.item;
+    if (!item || typeof item !== "object") {
+      return "";
+    }
+    return extractTextContent((item as Record<string, unknown>).content).trim();
+  }
+
+  return null;
+}
+
+function userMessageEvent(
+  id: string,
+  ts: string,
+  text: string,
+): TimelineEvent {
+  return {
+    id,
+    ts,
+    kind: "message",
+    role: "user",
+    text,
+    isPlan: false,
+  };
 }
 
 export function createThreadSummary(row: ThreadRow) {
@@ -135,14 +163,32 @@ export function normalizeRecord(
 
     if (type === "context_compacted") {
       return [
-        {
+        compactionEvent({
           id: createEventId(type, ts, lineNumber),
           ts,
-          kind: "compaction",
           state: "completed",
           title: "Context compaction completed",
-          detail: "Codex has completed long-session context compaction",
-        },
+          detail: describeCompactionDetail("completed", undefined),
+        }),
+      ];
+    }
+
+    if (
+      (type === "item_started" || type === "item_completed") &&
+      eventItemType(payload) === "ContextCompaction"
+    ) {
+      const state = type === "item_completed" ? "completed" : "running";
+      return [
+        compactionEvent({
+          id: createEventId(type, ts, lineNumber),
+          ts,
+          state,
+          title:
+            state === "completed"
+              ? "Context compaction completed"
+              : "Compacting context",
+          detail: describeCompactionDetail(state, undefined),
+        }),
       ];
     }
 
@@ -150,22 +196,14 @@ export function normalizeRecord(
       return [];
     }
 
-    if (type === "user_message") {
-      const message =
-        typeof payload.message === "string" ? payload.message : "";
-      if (!message) {
+    const userMessageText = userMessageTextFromEvent(type, payload);
+    if (userMessageText !== null) {
+      if (!userMessageText) {
         return [];
       }
 
       return [
-        {
-          id: createEventId(type, ts, lineNumber),
-          ts,
-          kind: "message",
-          role: "user",
-          text: message,
-          isPlan: false,
-        },
+        userMessageEvent(createEventId(type, ts, lineNumber), ts, userMessageText),
       ];
     }
 
@@ -218,17 +256,25 @@ export function normalizeRecord(
 
   if (outerType === "compacted") {
     const replacementItemCount = countReplacementHistoryItems(payload);
+    const compactedMessage =
+      typeof payload.message === "string" ? payload.message : "";
+    const replacedAssistantText = compactionReplacesAssistant(
+      context.lastAssistantText,
+      compactedMessage,
+    )
+      ? context.lastAssistantText
+      : undefined;
 
     return [
-      {
+      compactionEvent({
         id: createEventId(outerType, ts, lineNumber),
         ts,
-        kind: "compaction",
-        state: "running",
-        title: "Compacting context",
-        detail: describeCompactionDetail(replacementItemCount),
+        state: "completed",
+        title: "Context compaction completed",
+        detail: describeCompactionDetail("completed", replacementItemCount),
         replacementItemCount,
-      },
+        replacedAssistantText,
+      }),
     ];
   }
 
@@ -237,17 +283,20 @@ export function normalizeRecord(
 
     if (type === "compaction" || type === "context_compaction") {
       const hasEncryptedContent = typeof payload.encrypted_content === "string";
+      const state = hasEncryptedContent ? "completed" : "running";
       return [
-        {
+        compactionEvent({
           id: createEventId(type, ts, lineNumber),
           ts,
-          kind: "compaction",
-          state: hasEncryptedContent ? "completed" : "running",
-          title: hasEncryptedContent ? "Context compaction completed" : "Compacting context",
+          state,
+          title:
+            state === "completed"
+              ? "Context compaction completed"
+              : "Compacting context",
           detail: hasEncryptedContent
             ? "Codex generated compacted encrypted context"
             : "Codex is generating compacted context",
-        },
+        }),
       ];
     }
 
@@ -262,6 +311,12 @@ export function normalizeRecord(
       if (segments.length === 0) {
         return [];
       }
+
+      context.lastAssistantText = segments
+        .filter((segment) => segment.kind !== "plan")
+        .map((segment) => segment.text)
+        .join("\n\n")
+        .trim() || text;
 
       return segments.map((segment, index) => ({
         id: createEventId(

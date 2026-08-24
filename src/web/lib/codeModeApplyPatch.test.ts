@@ -73,6 +73,16 @@ test("patchChangesFromInvocation builds add file diffs", () => {
   assert.ok(changes[0]?.unifiedDiff.includes("+export const n = 1;"));
 });
 
+test("patchChangesFromInvocation keeps path-only deletes without a fake hunk", () => {
+  const changes = patchChangesFromInvocation(`*** Begin Patch
+*** Delete File: /tmp/main.py
+*** End Patch`);
+  assert.equal(changes.length, 1);
+  assert.equal(changes[0]?.changeType, "delete");
+  assert.equal(changes[0]?.displayPath, "main.py");
+  assert.equal(changes[0]?.unifiedDiff, "");
+});
+
 test("patchChangesFromInvocation builds update hunks", () => {
   const patch = `*** Begin Patch
 *** Update File: /home/zia/project/app/src/a.ts

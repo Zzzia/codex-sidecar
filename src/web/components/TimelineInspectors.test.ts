@@ -65,6 +65,37 @@ test("InlinePatchRun shows file preview controls when file context is available"
   assert.match(markup, /class="patch-preview-button"/);
 });
 
+test("InlinePatchRun hides empty delete bodies instead of showing a fake hunk", () => {
+  const item: PatchRunView = {
+    callId: "call-1",
+    id: "patch-1",
+    ts: "2026-04-22T08:00:00.000Z",
+    invocationText: "",
+    summary: "Code changes",
+    success: true,
+    changes: [
+      {
+        path: "/workspace/demo/main.py",
+        displayPath: "main.py",
+        changeType: "delete",
+        unifiedDiff: "",
+      },
+    ],
+  };
+
+  const markup = renderToStaticMarkup(
+    React.createElement(InlinePatchRun, { item, localFileContext: null }),
+  );
+
+  assert.match(markup, />delete</);
+  assert.match(markup, />main.py</);
+  assert.match(markup, /is-status-only/);
+  assert.doesNotMatch(markup, /--- a\/main.py/);
+  assert.doesNotMatch(markup, /\+\+\+ \/dev\/null/);
+  assert.doesNotMatch(markup, /class="inline-patch-body"/);
+  assert.doesNotMatch(markup, /<details/);
+});
+
 test("InlinePatchRun hides file preview controls for deleted files", () => {
   const item: PatchRunView = {
     callId: "call-1",

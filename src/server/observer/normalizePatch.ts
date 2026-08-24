@@ -40,6 +40,10 @@ function synthesizeUnifiedDiff(
   const fileLabel = displayName || path.basename(filePath) || filePath;
 
   if (info.type === "add") {
+    if (lines.length === 0) {
+      return "";
+    }
+
     return [
       "--- /dev/null",
       `+++ b/${fileLabel}`,
@@ -49,6 +53,10 @@ function synthesizeUnifiedDiff(
   }
 
   if (info.type === "delete") {
+    if (lines.length === 0) {
+      return "";
+    }
+
     return [
       `--- a/${fileLabel}`,
       "+++ /dev/null",

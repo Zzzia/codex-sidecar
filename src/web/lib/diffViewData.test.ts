@@ -54,6 +54,18 @@ test("prepareDiffView strips trailing move notes from unified diffs", () => {
   assert.equal(prepared.diffFile?.unifiedLineLength, 2);
 });
 
+test("prepareDiffView hides header-only delete diffs", () => {
+  const prepared = prepareDiffView(
+    "main.py",
+    "--- a/main.py\n+++ /dev/null\n@@ -0,0 +0,0 @@",
+    "delete",
+  );
+
+  assert.equal(prepared.diffFile, null);
+  assert.equal(prepared.fallbackText, "");
+  assert.equal(prepared.note, null);
+});
+
 test("prepareDiffView falls back to raw text for non-hunk diffs", () => {
   const prepared = prepareDiffView(
     "src/demo.bin",

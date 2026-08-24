@@ -536,6 +536,11 @@
   list-style: none;
 }
 
+.inline-patch-file.is-status-only .inline-patch-header {
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  cursor: default;
+}
+
 .inline-patch-header::-webkit-details-marker {
   display: none;
 }

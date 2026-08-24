@@ -40,6 +40,7 @@ export class ThreadRuntime {
   private loaded = false;
   private loading: Promise<void> | null = null;
   private status: ThreadSummary["status"] = "idle";
+  private lastAssistantText?: string;
 
   constructor(row: ThreadRow) {
     this.row = row;
@@ -239,16 +240,15 @@ export class ThreadRuntime {
       this.summary.contextWindowUsage,
     );
 
-    const nextEvents = normalizeRecord(
-      raw,
-      {
-        row: this.row,
-        callNames: this.callNames,
-        callArguments: this.callArguments,
-        status: this.status,
-      },
-      lineNumber,
-    );
+    const context = {
+      row: this.row,
+      callNames: this.callNames,
+      callArguments: this.callArguments,
+      status: this.status,
+      lastAssistantText: this.lastAssistantText,
+    };
+    const nextEvents = normalizeRecord(raw, context, lineNumber);
+    this.lastAssistantText = context.lastAssistantText;
 
     for (const event of nextEvents) {
       if (event.kind === "status") {

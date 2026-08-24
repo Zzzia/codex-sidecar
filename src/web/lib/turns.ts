@@ -15,6 +15,7 @@ import {
   registerDirectApplyPatch,
   settlePatchRun,
 } from "./turnsPatch";
+import { appendCompactionRun } from "./turnsCompaction";
 import {
   ensureToolRun,
   hydrateToolCommand,
@@ -22,7 +23,6 @@ import {
   placeToolRun,
 } from "./turnsTools";
 import type {
-  CompactionRunView,
   PatchRunView,
   ToolRunView,
   TurnBlock,
@@ -73,21 +73,6 @@ function createTurn(
   };
 }
 
-function ensureCompactionBlock(turn: MutableTurn): CompactionRunView[] {
-  const last = turn.blocks[turn.blocks.length - 1];
-  if (last?.type === "compaction_runs") {
-    return last.items;
-  }
-
-  const block: TurnBlock = {
-    type: "compaction_runs",
-    id: `compactions:${turn.blocks.length}`,
-    items: [],
-  };
-  turn.blocks.push(block);
-  return block.items;
-}
-
 function appendMarkdownBlock(turn: MutableTurn, text: string): void {
   const last = turn.blocks[turn.blocks.length - 1];
   if (last?.type === "assistant_markdown") {
@@ -113,41 +98,6 @@ function appendProposedPlanBlock(turn: MutableTurn, text: string): void {
     type: "proposed_plan",
     id: `proposed_plan:${turn.blocks.length}`,
     text,
-  });
-}
-
-function appendCompactionRun(
-  turn: MutableTurn,
-  event: Extract<TimelineEvent, { kind: "compaction" }>,
-): void {
-  const items = ensureCompactionBlock(turn);
-  if (event.state === "completed") {
-    let pending: CompactionRunView | null = null;
-    for (let index = items.length - 1; index >= 0; index -= 1) {
-      const item = items[index];
-      if (item && item.state !== "completed") {
-        pending = item;
-        break;
-      }
-    }
-    if (pending) {
-      pending.state = event.state;
-      pending.title = event.title;
-      pending.detail = event.detail ?? pending.detail;
-      pending.completedAt = event.ts;
-      return;
-    }
-  }
-
-  items.push({
-    id: event.id,
-    ts: event.ts,
-    state: event.state,
-    title: event.title,
-    detail: event.detail ?? "",
-    ...(typeof event.replacementItemCount === "number"
-      ? { replacementItemCount: event.replacementItemCount }
-      : {}),
   });
 }
 

@@ -188,6 +188,13 @@ function extractDiffText(unifiedDiff: string, fileName: string, changeType: Patc
     return { diffText: "", note: noteLines.join("\n").trim() || null };
   }
 
+  const hasContentLine = bodyLines.some(
+    (line) => !isHunkHeaderLine(line) && line.length > 0 && !line.startsWith("\\"),
+  );
+  if (!hasContentLine) {
+    return { diffText: "", note: noteLines.join("\n").trim() || null };
+  }
+
   const [fallbackOldHeader, fallbackNewHeader] = defaultHeaders(fileName, changeType);
   const normalizedBody = normalizeHunkHeaders(bodyLines);
   const diffText = [
@@ -202,6 +209,21 @@ function extractDiffText(unifiedDiff: string, fileName: string, changeType: Patc
   };
 }
 
+function isHeaderOnlyDiff(unifiedDiff: string): boolean {
+  const lines = stripTrailingEmpty(normalizeLines(unifiedDiff));
+  if (lines.length === 0) {
+    return true;
+  }
+
+  return lines.every(
+    (line) =>
+      line.startsWith("--- ") ||
+      line.startsWith("+++ ") ||
+      isHunkHeaderLine(line) ||
+      line.trim() === "",
+  );
+}
+
 export function prepareDiffView(
   fileName: string,
   unifiedDiff: string,
@@ -212,7 +234,7 @@ export function prepareDiffView(
   if (!diffText) {
     return {
       diffFile: null,
-      fallbackText: unifiedDiff,
+      fallbackText: isHeaderOnlyDiff(unifiedDiff) ? "" : unifiedDiff,
       note,
     };
   }

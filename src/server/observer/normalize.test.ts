@@ -543,6 +543,39 @@ test("normalizeRecord synthesizes unified diff for added files", () => {
   assert.match(events[0].changes[0]?.unifiedDiff ?? "", /\+export const value = 1;/);
 });
 
+test("normalizeRecord keeps path-only deletes without a fake hunk", () => {
+  const events = normalizeRecord(
+    {
+      timestamp: "2026-04-22T08:00:03.000Z",
+      type: "event_msg",
+      payload: {
+        type: "patch_apply_end",
+        call_id: "call-3",
+        success: true,
+        changes: {
+          "/workspace/demo/main.py": {
+            type: "delete",
+          },
+        },
+      },
+    },
+    {
+      row,
+      callNames: new Map(),
+      status: "running",
+    },
+    4,
+  );
+
+  assert.equal(events[0]?.kind, "patch");
+  if (events[0]?.kind !== "patch") {
+    assert.fail("expected patch event");
+  }
+  assert.equal(events[0].changes[0]?.changeType, "delete");
+  assert.equal(events[0].changes[0]?.displayPath, "main.py");
+  assert.equal(events[0].changes[0]?.unifiedDiff, "");
+});
+
 test("normalizeRecord ignores token_count and agent_message duplicates", () => {
   const metricEvents = normalizeRecord(
     {
@@ -581,7 +614,7 @@ test("normalizeRecord ignores token_count and agent_message duplicates", () => {
   assert.deepEqual(agentEvents, []);
 });
 
-test("normalizeRecord exposes context compaction checkpoints without payload text", () => {
+test("normalizeRecord treats compacted checkpoints as completed without payload text", () => {
   const events = normalizeRecord(
     {
       timestamp: "2026-04-22T08:00:01.000Z",
@@ -607,9 +640,101 @@ test("normalizeRecord exposes context compaction checkpoints without payload tex
   if (events[0]?.kind !== "compaction") {
     assert.fail("expected compaction event");
   }
-  assert.equal(events[0].state, "running");
+  assert.equal(events[0].state, "completed");
+  assert.equal(events[0].title, "Context compaction completed");
   assert.equal(events[0].replacementItemCount, 2);
+  assert.equal(events[0].replacedAssistantText, undefined);
   assert.doesNotMatch(events[0].detail ?? "", /hidden summary|encrypted/);
+});
+
+test("normalizeRecord marks a preceding compaction summary for removal", () => {
+  const context = {
+    row,
+    callNames: new Map(),
+    status: "running" as const,
+  };
+  const summary =
+    "## 交接摘要\n\n继续处理未完成的审查，保留当前范围、已读材料和尚未确认的阻塞项。";
+  normalizeRecord(
+    {
+      timestamp: "2026-04-22T08:00:01.000Z",
+      type: "response_item",
+      payload: {
+        type: "message",
+        role: "assistant",
+        content: [{ type: "output_text", text: summary }],
+      },
+    },
+    context,
+    3,
+  );
+
+  const events = normalizeRecord(
+    {
+      timestamp: "2026-04-22T08:00:02.000Z",
+      type: "compacted",
+      payload: {
+        message:
+          "Another language model started to solve this problem and produced a summary of its thinking process.\n\n" +
+          summary,
+        replacement_history: [{ type: "message", role: "user", content: [] }],
+      },
+    },
+    context,
+    4,
+  );
+
+  assert.equal(events[0]?.kind, "compaction");
+  if (events[0]?.kind !== "compaction") {
+    assert.fail("expected compaction event");
+  }
+  assert.equal(events[0].state, "completed");
+  assert.equal(events[0].replacedAssistantText, summary);
+});
+
+test("normalizeRecord does not hide unrelated assistant text before compaction", () => {
+  const context = {
+    row,
+    callNames: new Map(),
+    status: "running" as const,
+  };
+  normalizeRecord(
+    {
+      timestamp: "2026-04-22T08:00:01.000Z",
+      type: "response_item",
+      payload: {
+        type: "message",
+        role: "assistant",
+        content: [
+          {
+            type: "output_text",
+            text: "实时对象已经确认：共享运行池是独立工作负载。",
+          },
+        ],
+      },
+    },
+    context,
+    3,
+  );
+
+  const events = normalizeRecord(
+    {
+      timestamp: "2026-04-22T08:00:02.000Z",
+      type: "compacted",
+      payload: {
+        message: "",
+        replacement_history: [{ type: "message", role: "user", content: [] }],
+      },
+    },
+    context,
+    4,
+  );
+
+  assert.equal(events[0]?.kind, "compaction");
+  if (events[0]?.kind !== "compaction") {
+    assert.fail("expected compaction event");
+  }
+  assert.equal(events[0].replacedAssistantText, undefined);
 });
 
 test("normalizeRecord marks context_compacted as completion", () => {
@@ -636,6 +761,192 @@ test("normalizeRecord marks context_compacted as completion", () => {
   }
   assert.equal(events[0].state, "completed");
   assert.equal(events[0].title, "Context compaction completed");
+});
+
+test("normalizeRecord marks ContextCompaction item lifecycle as compaction status", () => {
+  const started = normalizeRecord(
+    {
+      timestamp: "2026-04-22T08:00:01.000Z",
+      type: "event_msg",
+      payload: {
+        type: "item_started",
+        item: { type: "ContextCompaction", id: "compact-1" },
+      },
+    },
+    {
+      row,
+      callNames: new Map(),
+      status: "running",
+    },
+    5,
+  );
+  const completed = normalizeRecord(
+    {
+      timestamp: "2026-04-22T08:00:02.000Z",
+      type: "event_msg",
+      payload: {
+        type: "item_completed",
+        item: { type: "ContextCompaction", id: "compact-1" },
+      },
+    },
+    {
+      row,
+      callNames: new Map(),
+      status: "running",
+    },
+    6,
+  );
+
+  assert.equal(started[0]?.kind, "compaction");
+  if (started[0]?.kind !== "compaction") {
+    assert.fail("expected compaction start");
+  }
+  assert.equal(started[0].state, "running");
+  assert.equal(completed[0]?.kind, "compaction");
+  if (completed[0]?.kind !== "compaction") {
+    assert.fail("expected compaction completion");
+  }
+  assert.equal(completed[0].state, "completed");
+  assert.equal(completed[0].title, "Context compaction completed");
+});
+
+test("normalizeRecord extracts legacy event_msg user_message text", () => {
+  const events = normalizeRecord(
+    {
+      timestamp: "2026-04-22T08:00:01.000Z",
+      type: "event_msg",
+      payload: {
+        type: "user_message",
+        message: "帮我看一下方案",
+      },
+    },
+    {
+      row,
+      callNames: new Map(),
+      status: "idle",
+    },
+    2,
+  );
+
+  assert.equal(events.length, 1);
+  assert.equal(events[0]?.kind, "message");
+  if (events[0]?.kind !== "message") {
+    assert.fail("expected user message event");
+  }
+  assert.equal(events[0].role, "user");
+  assert.equal(events[0].text, "帮我看一下方案");
+  assert.equal(events[0].isPlan, false);
+});
+
+test("normalizeRecord extracts item_completed UserMessage as user input", () => {
+  const events = normalizeRecord(
+    {
+      timestamp: "2026-08-19T15:46:20.000Z",
+      type: "event_msg",
+      payload: {
+        type: "item_completed",
+        item: {
+          type: "UserMessage",
+          id: "item-user-1",
+          content: [
+            {
+              type: "text",
+              text: "现在的 orchestrator 是怎么部署的？",
+              text_elements: [],
+            },
+          ],
+        },
+      },
+    },
+    {
+      row,
+      callNames: new Map(),
+      status: "idle",
+    },
+    8,
+  );
+
+  assert.equal(events.length, 1);
+  assert.equal(events[0]?.kind, "message");
+  if (events[0]?.kind !== "message") {
+    assert.fail("expected user message event");
+  }
+  assert.equal(events[0].role, "user");
+  assert.equal(events[0].text, "现在的 orchestrator 是怎么部署的？");
+  assert.equal(events[0].isPlan, false);
+});
+
+test("normalizeRecord ignores item_started UserMessage and empty completed content", () => {
+  const started = normalizeRecord(
+    {
+      timestamp: "2026-08-19T15:46:20.000Z",
+      type: "event_msg",
+      payload: {
+        type: "item_started",
+        item: {
+          type: "UserMessage",
+          id: "item-user-1",
+          content: [{ type: "text", text: "现在的 orchestrator 是怎么部署的？" }],
+        },
+      },
+    },
+    {
+      row,
+      callNames: new Map(),
+      status: "idle",
+    },
+    7,
+  );
+  const emptyCompleted = normalizeRecord(
+    {
+      timestamp: "2026-08-19T15:46:21.000Z",
+      type: "event_msg",
+      payload: {
+        type: "item_completed",
+        item: {
+          type: "UserMessage",
+          id: "item-user-2",
+          content: [{ type: "text", text: "   " }],
+        },
+      },
+    },
+    {
+      row,
+      callNames: new Map(),
+      status: "idle",
+    },
+    8,
+  );
+
+  assert.deepEqual(started, []);
+  assert.deepEqual(emptyCompleted, []);
+});
+
+test("normalizeRecord still drops response_item user messages", () => {
+  const events = normalizeRecord(
+    {
+      timestamp: "2026-08-19T15:46:20.000Z",
+      type: "response_item",
+      payload: {
+        type: "message",
+        role: "user",
+        content: [
+          {
+            type: "input_text",
+            text: "# AGENTS.md instructions for /workspace/demo",
+          },
+        ],
+      },
+    },
+    {
+      row,
+      callNames: new Map(),
+      status: "idle",
+    },
+    6,
+  );
+
+  assert.deepEqual(events, []);
 });
 
 test("normalizeRecord treats turn_aborted as a terminal non-active status", () => {

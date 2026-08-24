@@ -17,6 +17,10 @@ export function DiffViewer({
     [changeType, fileName, unifiedDiff],
   );
 
+  if (!prepared.diffFile && !prepared.fallbackText && !prepared.note) {
+    return null;
+  }
+
   return (
     <div className="diff-viewer">
       {prepared.note ? <div className="diff-viewer-note">{prepared.note}</div> : null}
@@ -29,14 +33,14 @@ export function DiffViewer({
           diffViewFontSize={13}
           diffViewTheme="light"
         />
-      ) : (
+      ) : prepared.fallbackText ? (
         <CopyableCodeBlock
           className="code-block"
           copyText={prepared.fallbackText}
         >
           {prepared.fallbackText}
         </CopyableCodeBlock>
-      )}
+      ) : null}
     </div>
   );
 }

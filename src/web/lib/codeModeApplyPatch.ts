@@ -251,12 +251,14 @@ function flushPatchSection(
     const contentLines = section.bodyLines.map((line) =>
       line.startsWith("+") ? line.slice(1) : line,
     );
-    unifiedDiff = [
-      "--- /dev/null",
-      `+++ b/${displayPath}`,
-      `@@ -0,0 +1,${contentLines.length} @@`,
-      ...contentLines.map((line) => `+${line}`),
-    ].join("\n");
+    if (contentLines.length > 0) {
+      unifiedDiff = [
+        "--- /dev/null",
+        `+++ b/${displayPath}`,
+        `@@ -0,0 +1,${contentLines.length} @@`,
+        ...contentLines.map((line) => `+${line}`),
+      ].join("\n");
+    }
   } else if (section.changeType === "delete") {
     const contentLines = section.bodyLines.map((line) =>
       line.startsWith("-") ? line.slice(1) : line,
@@ -268,10 +270,6 @@ function flushPatchSection(
         `@@ -1,${contentLines.length} +0,0 @@`,
         ...contentLines.map((line) => `-${line}`),
       ].join("\n");
-    } else {
-      unifiedDiff = [`--- a/${displayPath}`, "+++ /dev/null", "@@ -0,0 +0,0 @@"].join(
-        "\n",
-      );
     }
   } else {
     const body = section.bodyLines.join("\n").trim();

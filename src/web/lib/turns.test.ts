@@ -736,8 +736,8 @@ test("buildTurnCards renders context compaction as a merged status block", () =>
       ts: "2026-04-22T08:00:02.000Z",
       kind: "compaction",
       state: "running",
-      title: "正在压缩上下文",
-      detail: "Codex 正在整理长会话上下文",
+      title: "Compacting context",
+      detail: "Codex is organizing long-session context",
       replacementItemCount: 10,
     },
     {
@@ -745,8 +745,8 @@ test("buildTurnCards renders context compaction as a merged status block", () =>
       ts: "2026-04-22T08:00:03.000Z",
       kind: "compaction",
       state: "completed",
-      title: "上下文压缩完成",
-      detail: "Codex 已完成长会话上下文压缩",
+      title: "Context compaction completed",
+      detail: "Codex completed long-session context compaction, keeping 10 history items",
     },
     {
       id: "m1",
@@ -767,8 +767,87 @@ test("buildTurnCards renders context compaction as a merged status block", () =>
   }
   assert.equal(cards[0].blocks[0].items.length, 1);
   assert.equal(cards[0].blocks[0].items[0]?.state, "completed");
+  assert.equal(cards[0].blocks[0].items[0]?.title, "Context compaction completed");
   assert.equal(cards[0].blocks[0].items[0]?.replacementItemCount, 10);
   assert.equal(cards[0]?.blocks[1]?.type, "assistant_markdown");
+});
+
+test("buildTurnCards hides the compaction summary and merges later completion events", () => {
+  const summary = "## 交接摘要\n\n继续处理未完成的审查。";
+  const events: TimelineEvent[] = [
+    {
+      id: "u1",
+      ts: "2026-04-22T08:00:01.000Z",
+      kind: "message",
+      role: "user",
+      text: "继续",
+      isPlan: false,
+    },
+    {
+      id: "visible",
+      ts: "2026-04-22T08:00:02.000Z",
+      kind: "message",
+      role: "assistant",
+      text: "先确认当前范围。",
+      isPlan: false,
+    },
+    {
+      id: "summary",
+      ts: "2026-04-22T08:00:03.000Z",
+      kind: "message",
+      role: "assistant",
+      text: summary,
+      isPlan: false,
+    },
+    {
+      id: "compacted",
+      ts: "2026-04-22T08:00:04.000Z",
+      kind: "compaction",
+      state: "completed",
+      title: "Context compaction completed",
+      detail: "Codex completed long-session context compaction, keeping 6 history items",
+      replacementItemCount: 6,
+      replacedAssistantText: summary,
+    },
+    {
+      id: "item-completed",
+      ts: "2026-04-22T08:00:05.000Z",
+      kind: "compaction",
+      state: "completed",
+      title: "Context compaction completed",
+      detail: "Codex has completed long-session context compaction",
+    },
+    {
+      id: "after",
+      ts: "2026-04-22T08:00:06.000Z",
+      kind: "message",
+      role: "assistant",
+      text: "压缩后继续。",
+      isPlan: false,
+    },
+  ];
+
+  const cards = buildTurnCards(events);
+  assert.equal(cards.length, 1);
+  assert.equal(cards[0]?.blocks.length, 3);
+  assert.equal(cards[0]?.blocks[0]?.type, "assistant_markdown");
+  if (cards[0]?.blocks[0]?.type !== "assistant_markdown") {
+    assert.fail("expected earlier assistant text to remain");
+  }
+  assert.equal(cards[0].blocks[0].text, "先确认当前范围。");
+  assert.equal(cards[0]?.blocks[1]?.type, "compaction_runs");
+  if (cards[0]?.blocks[1]?.type !== "compaction_runs") {
+    assert.fail("expected compaction block");
+  }
+  assert.equal(cards[0].blocks[1].items.length, 1);
+  assert.equal(cards[0].blocks[1].items[0]?.state, "completed");
+  assert.equal(cards[0].blocks[1].items[0]?.replacementItemCount, 6);
+  assert.doesNotMatch(cards[0].blocks[1].items[0]?.detail ?? "", /交接摘要/);
+  assert.equal(cards[0]?.blocks[2]?.type, "assistant_markdown");
+  if (cards[0]?.blocks[2]?.type !== "assistant_markdown") {
+    assert.fail("expected post-compaction assistant text");
+  }
+  assert.equal(cards[0].blocks[2].text, "压缩后继续。");
 });
 
 test("buildTurnCards filters write_stdin tool events", () => {

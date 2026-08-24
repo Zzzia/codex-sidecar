@@ -38,12 +38,16 @@ When entering the codebase for the first time, read these files first:
   - Snapshot loading and SSE subscription
 - `src/web/lib/turns.ts`
   - Core logic for grouping timeline events by turn
+- `src/web/lib/turnsCompaction.ts`
+  - Merges compaction status events and hides replaced handoff summaries
 - `src/web/lib/progress.ts`
   - Converts `update_plan` and assistant plans into the bottom progress area
 - `src/web/components/Timeline.tsx`
   - Main timeline rendering
 - `src/web/components/TimelineInspectors.tsx`
   - Tool detail modal and patch display
+- `src/web/components/TimelinePatchFiles.tsx`
+  - Inline patch file cards, including path-only deletes
 - `src/web/state/workspace.ts`
   - Multi-pane workspace data model and persistence
 - `docs/auto-workspace.md`
@@ -96,6 +100,9 @@ flowchart LR
 - `src/server/observer/normalize.ts`
   - Detects message, tool, patch, status, and metric events
   - Changes here are the most likely to cause frontend/backend regressions
+- `src/server/observer/normalizeCompaction.ts`
+  - Compaction checkpoint and lifecycle mapping
+  - Marks preceding handoff summaries for timeline removal
 
 ### Shared Layer
 
@@ -123,6 +130,7 @@ flowchart LR
   - `PaneView.tsx`: single thread pane
   - `Timeline.tsx`: timeline rendering
   - `TimelineInspectors.tsx`: tool detail and patch expansion UI
+  - `TimelinePatchFiles.tsx`: inline patch file cards
   - `PaneProgress.tsx`: bottom progress bar
 
 ## Product Constraints
@@ -161,13 +169,19 @@ These behaviors are part of the current product semantics. Understand why they e
 - Patches are independent blocks.
 - They are expanded by default and can be collapsed manually.
 - If diff parsing fails, fall back to raw text instead of rendering an empty shell.
-- Relevant entry points: `src/web/lib/diffViewData.ts` and `src/web/components/TimelineInspectors.tsx`
+- Relevant entry points: `src/web/lib/diffViewData.ts`, `src/web/components/TimelineInspectors.tsx`, and `src/web/components/TimelinePatchFiles.tsx`
 
 ### 7. Do Not Display Token Usage
 
 - This is a current product decision.
 - It is acceptable to show `Context xx%` style context-window usage in pane headers.
 - Do not render `token_count` in the timeline, and do not turn the product into a token, trace, or debug-metric observability platform.
+
+### 8. Context Compaction Is A Status, Not Content
+
+- A finished compaction should show a completed status, not stay on `Compacting context`.
+- Compacted replacement history and the preceding handoff summary stay out of the timeline body.
+- Relevant entry points: `src/server/observer/normalize.ts`, `src/server/observer/normalizeCompaction.ts`, and `src/web/lib/turnsCompaction.ts`
 
 ## Change Constraints
 
@@ -176,8 +190,10 @@ These behaviors are part of the current product semantics. Understand why they e
 If you modify any of these files:
 
 - `src/server/observer/normalize.ts`
+- `src/server/observer/normalizeCompaction.ts`
 - `src/shared/types.ts`
 - `src/web/lib/turns.ts`
+- `src/web/lib/turnsCompaction.ts`
 - `src/web/lib/progress.ts`
 
 Do all three:

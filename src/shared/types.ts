@@ -176,6 +176,7 @@ export type TimelineEvent =
       title: string;
       detail?: string;
       replacementItemCount?: number;
+      replacedAssistantText?: string;
     }
   | {
       id: string;
